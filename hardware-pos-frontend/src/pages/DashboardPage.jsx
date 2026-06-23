@@ -38,6 +38,27 @@ function DashboardPage() {
             Role: {user?.role}
           </Typography>
 
+          {user?.role === "OWNER" && (
+          <Button
+             variant="outlined"
+             onClick={() => navigate("/users")}
+             sx={{ mt: 3, mr: 2 }}
+            >
+             Manage Users
+          </Button>
+            )}
+
+
+            {["OWNER", "MANAGER"].includes(user?.role) && (
+            <Button
+                 variant="outlined"
+                   onClick={() => navigate("/units")}
+                   sx={{ mt: 3, mr: 2 }}
+                >
+                Manage Units
+            </Button>
+)}
+
           <Button
             variant="contained"
             onClick={handleLogout}

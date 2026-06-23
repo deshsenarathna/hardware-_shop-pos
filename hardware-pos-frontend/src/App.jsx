@@ -8,6 +8,10 @@ import { useAuth } from "./auth/AuthContext";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
+import UnauthorizedPage from "./pages/UnauthorizedPage.jsx";
+import UserManagementPage from "./pages/UserManagementPage.jsx";
+import RoleRoute from "./auth/RoleRoute";
+import UnitManagementPage from "./pages/UnitManagementPage.jsx";
 
 function App() {
   const { isAuthenticated } = useAuth();
@@ -33,6 +37,33 @@ function App() {
       />
 
       <Route
+        path="/unauthorized"
+        element={
+           <ProtectedRoute>
+              <UnauthorizedPage />
+           </ProtectedRoute>
+         }
+      />
+      
+      <Route
+         path="/users"
+         element={
+           <RoleRoute allowedRoles={["OWNER"]}>
+              <UserManagementPage />
+           </RoleRoute>
+         }
+      />
+
+      <Route
+        path="/units"
+        element={
+          <RoleRoute allowedRoles={["OWNER", "MANAGER"]}>
+              <UnitManagementPage />
+          </RoleRoute>
+         }
+     />
+
+      <Route
         path="*"
         element={
           <Navigate
@@ -45,6 +76,8 @@ function App() {
           />
         }
       />
+
+      
     </Routes>
   );
 }

@@ -56,6 +56,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/test/protected")
                         .authenticated()
 
+                        //Any logged in owner or manager can use this endpoint
+                        .requestMatchers(
+                                "/api/units/**"
+                        ).hasAnyRole("OWNER", "MANAGER")
+
                         // All other endpoints require authentication
                         .anyRequest()
                         .authenticated()
