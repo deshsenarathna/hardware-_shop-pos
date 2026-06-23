@@ -61,6 +61,14 @@ public class SecurityConfig {
                                 "/api/units/**"
                         ).hasAnyRole("OWNER", "MANAGER")
 
+                        .requestMatchers(
+                                "/api/categories/**"
+                        ).hasAnyRole("OWNER", "MANAGER")
+
+                        .requestMatchers(
+                                "/api/brands/**"
+                        ).hasAnyRole("OWNER", "MANAGER")
+
                         // All other endpoints require authentication
                         .anyRequest()
                         .authenticated()

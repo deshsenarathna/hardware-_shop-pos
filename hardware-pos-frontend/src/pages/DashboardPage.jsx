@@ -57,7 +57,27 @@ function DashboardPage() {
                 >
                 Manage Units
             </Button>
-)}
+           )}
+
+           {["OWNER", "MANAGER"].includes(user?.role) && (
+                <Button
+                  variant="outlined"
+                  onClick={() => navigate("/categories")}
+                  sx={{ mt: 3, mr: 2 }}
+                 >
+                   Manage Categories
+               </Button>
+           )}
+
+           {["OWNER", "MANAGER"].includes(user?.role) && (
+                <Button
+                  variant="outlined"
+                  onClick={() => navigate("/brands")}
+                  sx={{ mt: 3, mr: 2 }}
+                 >
+                   Manage Brands
+               </Button>
+           )}
 
           <Button
             variant="contained"
