@@ -13,7 +13,9 @@ import UserManagementPage from "./pages/UserManagementPage.jsx";
 import RoleRoute from "./auth/RoleRoute";
 import UnitManagementPage from "./pages/UnitManagementPage.jsx";
 import CategoryManagementPage from "./pages/CategoryManagementPage.jsx";
-import BrandManagementPage from "./pages/BrandManagement.jsx";
+import BrandManagementPage from "./pages/BrandManagement.jsx"
+import ProductManagementPage from "./pages/ProductManagement.jsx";
+import CashierPage from "./pages/CashierPage.jsx";
 
 function App() {
   const { isAuthenticated } = useAuth();
@@ -72,7 +74,7 @@ function App() {
                <CategoryManagementPage />
            </RoleRoute>
           }
-    />
+     />
 
        <Route
          path="/brands"
@@ -81,7 +83,25 @@ function App() {
                           <BrandManagementPage />
                       </RoleRoute>
                   }
-      />
+       />
+
+       <Route
+         path="/products"
+          element={
+                      <RoleRoute allowedRoles={["OWNER", "MANAGER"]}>
+                          <ProductManagementPage />
+                      </RoleRoute>
+                  }
+       />
+       
+       <Route
+         path="/new-sale"
+          element={
+                      <RoleRoute allowedRoles={["OWNER", "MANAGER", "CASHIER"]}>
+                          <CashierPage />
+                      </RoleRoute>
+                  }
+       />
 
       <Route
         path="*"

@@ -2,6 +2,7 @@ package com.hardwarepos.hardware_pos_backend.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -49,7 +50,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/test/owner")
                         .hasRole("OWNER")
 
-                        .requestMatchers("/api/users/create/**")
+                        .requestMatchers(
+                                "/api/users/create/**")
                         .hasRole("OWNER")
 
                         // Any logged-in user can use this endpoint
@@ -67,6 +69,20 @@ public class SecurityConfig {
 
                         .requestMatchers(
                                 "/api/brands/**"
+                        ).hasAnyRole("OWNER", "MANAGER")
+
+
+
+                        .requestMatchers( HttpMethod.GET, "/api/products/**"
+                        ).hasAnyRole("OWNER", "MANAGER", "CASHIER")
+
+                        .requestMatchers( HttpMethod.POST, "/api/products/**"
+                        ).hasAnyRole("OWNER", "MANAGER")
+
+                        .requestMatchers( HttpMethod.PUT, "/api/products/**"
+                        ).hasAnyRole("OWNER", "MANAGER")
+
+                        .requestMatchers( HttpMethod.DELETE, "/api/products/**"
                         ).hasAnyRole("OWNER", "MANAGER")
 
                         // All other endpoints require authentication

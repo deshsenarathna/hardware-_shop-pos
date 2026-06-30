@@ -1,4 +1,6 @@
 package com.hardwarepos.hardware_pos_backend.sales;
 
-public class SaleRepository {
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface SaleRepository extends JpaRepository<Sale, Long> {
 }
