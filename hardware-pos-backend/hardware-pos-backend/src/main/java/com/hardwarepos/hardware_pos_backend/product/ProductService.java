@@ -125,6 +125,12 @@ public class ProductService {
                 request.getReorderLevel()
         );
 
+        product.setLocation(
+                request.getLocation() == null
+                        ? null
+                        : request.getLocation().trim()
+        );
+
         Product savedProduct =
                 productRepository.save(product);
 
@@ -237,6 +243,11 @@ public class ProductService {
         product.setPurchasePrice(request.getPurchasePrice());
         product.setSellingPrice(request.getSellingPrice());
         product.setReorderLevel(request.getReorderLevel());
+        product.setLocation(
+                request.getLocation() == null
+                        ? null
+                        : request.getLocation().trim()
+        );
 
         Product updatedProduct =
                 productRepository.save(product);
@@ -335,6 +346,7 @@ public class ProductService {
                 product.getPurchasePrice(),
                 product.getSellingPrice(),
                 product.getReorderLevel(),
+                product.getLocation(),
 
                 product.isActive(),
                 product.getCreatedAt(),
@@ -342,4 +354,3 @@ public class ProductService {
         );
     }
 }
-

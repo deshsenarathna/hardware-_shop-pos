@@ -85,6 +85,12 @@ public class SecurityConfig {
                         .requestMatchers( HttpMethod.DELETE, "/api/products/**"
                         ).hasAnyRole("OWNER", "MANAGER")
 
+
+                        .requestMatchers( HttpMethod.GET, "/api/inventory/**"
+                        ).hasAnyRole("OWNER", "MANAGER", "CASHIER")
+
+                        .requestMatchers( HttpMethod.POST, "/api/inventory/**"
+                        ).hasAnyRole("OWNER", "MANAGER")
                         // All other endpoints require authentication
                         .anyRequest()
                         .authenticated()

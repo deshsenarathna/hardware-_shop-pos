@@ -79,6 +79,9 @@ public class Product {
     )
     private BigDecimal reorderLevel;
 
+    @Column(length = 100)
+    private String location;
+
     @Column(nullable = false)
     private boolean active = true;
 
@@ -207,6 +210,14 @@ public class Product {
 
     public void setReorderLevel(BigDecimal reorderLevel) {
         this.reorderLevel = reorderLevel;
+    }
+
+    public String getLocation() {
+        return location;
+    }
+
+    public void setLocation(String location) {
+        this.location = location;
     }
 
     public boolean isActive() {

@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Service
 public class InventoryService {
@@ -28,7 +29,7 @@ public class InventoryService {
     // INCREASE STOCK
     // =========================
     @Transactional
-    public void increaseStock(
+    public InventoryStock increaseStock(
             Long productId,
             BigDecimal quantity,
             StockTransactionType type,
@@ -49,7 +50,7 @@ public class InventoryService {
         BigDecimal after = before.add(quantity);
 
         stock.setQuantityOnHand(after);
-        stockRepository.save(stock);
+        InventoryStock savedStock = stockRepository.save(stock);
 
         StockTransaction transaction = new StockTransaction();
         transaction.setProduct(product);
@@ -61,6 +62,8 @@ public class InventoryService {
         transaction.setNotes(notes);
 
         transactionRepository.save(transaction);
+
+        return savedStock;
     }
 
     // =========================
@@ -117,5 +120,20 @@ public class InventoryService {
         stock.setQuantityOnHand(BigDecimal.ZERO);
 
         stockRepository.save(stock);
+    }
+
+    // =========================
+    // READ STOCK LEVELS
+    // =========================
+    public List<InventoryStock> getAllStock() {
+        return stockRepository.findAll();
+    }
+
+    public InventoryStock getStockForProduct(Long productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new RuntimeException("Product not found"));
+
+        return stockRepository.findByProduct(product)
+                .orElseThrow(() -> new RuntimeException("Stock not found"));
     }
 }

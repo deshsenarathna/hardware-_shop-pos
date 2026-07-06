@@ -52,6 +52,9 @@ public class CreateProductRequest {
     )
     private BigDecimal reorderLevel;
 
+    @Size(max = 100, message = "Location cannot exceed 100 characters")
+    private String location;
+
     public CreateProductRequest() {
     }
 
@@ -126,5 +129,12 @@ public class CreateProductRequest {
     public void setReorderLevel(BigDecimal reorderLevel) {
         this.reorderLevel = reorderLevel;
     }
-}
 
+    public String getLocation() {
+        return location;
+    }
+
+    public void setLocation(String location) {
+        this.location = location;
+    }
+}

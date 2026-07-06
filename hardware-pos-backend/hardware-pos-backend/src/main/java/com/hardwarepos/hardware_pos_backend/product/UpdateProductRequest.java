@@ -37,6 +37,9 @@ public class UpdateProductRequest {
     @NotNull(message = "Measurement unit is required")
     private Long unitId;
 
+    @Size(max = 100, message = "Location cannot exceed 100 characters")
+    private String location;
+
     @NotNull(message = "Purchase price is required")
     @DecimalMin(
             value = "0.00",
@@ -126,6 +129,14 @@ public class UpdateProductRequest {
 
     public void setSellingPrice(BigDecimal sellingPrice) {
         this.sellingPrice = sellingPrice;
+    }
+
+    public String getLocation() {
+        return location;
+    }
+
+    public void setLocation(String location) {
+        this.location = location;
     }
 
     public BigDecimal getReorderLevel() {

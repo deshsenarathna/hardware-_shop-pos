@@ -24,6 +24,7 @@ public class ProductResponse {
     private final BigDecimal purchasePrice;
     private final BigDecimal sellingPrice;
     private final BigDecimal reorderLevel;
+    private final String location;
 
     private final boolean active;
     private final LocalDateTime createdAt;
@@ -45,6 +46,7 @@ public class ProductResponse {
             BigDecimal purchasePrice,
             BigDecimal sellingPrice,
             BigDecimal reorderLevel,
+            String location,
             boolean active,
             LocalDateTime createdAt,
             LocalDateTime updatedAt
@@ -64,6 +66,7 @@ public class ProductResponse {
         this.purchasePrice = purchasePrice;
         this.sellingPrice = sellingPrice;
         this.reorderLevel = reorderLevel;
+        this.location = location;
         this.active = active;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
@@ -127,6 +130,10 @@ public class ProductResponse {
 
     public BigDecimal getReorderLevel() {
         return reorderLevel;
+    }
+
+    public String getLocation() {
+        return location;
     }
 
     public boolean isActive() {
