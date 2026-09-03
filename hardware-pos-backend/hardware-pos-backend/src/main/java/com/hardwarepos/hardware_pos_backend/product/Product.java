@@ -15,6 +15,17 @@ import java.time.LocalDateTime;
                 @UniqueConstraint(
                         name = "uk_product_code",
                         columnNames = "product_code"
+                ),
+                @UniqueConstraint(
+                        name = "uk_product_barcode",
+                        columnNames = "barcode"
+                )
+        },
+
+        indexes = {
+                @Index(
+                        name = "idx_product_barcode",
+                        columnList = "barcode"
                 )
         }
 )
@@ -30,6 +41,12 @@ public class Product {
             length = 50
     )
     private String productCode;
+
+    @Column(
+            name = "barcode",
+            length = 64
+    )
+    private String barcode;
 
     @Column(nullable = false, length = 150)
     private String name;
@@ -111,6 +128,7 @@ public class Product {
             BigDecimal purchasePrice,
             BigDecimal sellingPrice,
             BigDecimal reorderLevel
+
     ) {
         this.productCode = productCode;
         this.name = name;
@@ -147,6 +165,10 @@ public class Product {
     public void setProductCode(String productCode) {
         this.productCode = productCode;
     }
+
+    public String getBarcode(){return barcode;}
+
+    public void setBarcode(String barcode) { this.barcode = barcode;}
 
     public String getName() {
         return name;

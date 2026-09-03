@@ -13,6 +13,9 @@ public class CreateProductRequest {
     @Size(max = 50, message = "Product code cannot exceed 50 characters")
     private String productCode;
 
+    @Size(max = 50, message = "Barcode cannot exceed 50 characters")
+    private String barcode;
+
     @NotBlank(message = "Product name is required")
     @Size(max = 150, message = "Product name cannot exceed 150 characters")
     private String name;
@@ -65,6 +68,10 @@ public class CreateProductRequest {
     public void setProductCode(String productCode) {
         this.productCode = productCode;
     }
+
+    public String getBarcode() { return barcode;}
+
+    public void setBarcode(String barcode) { this.barcode = barcode;}
 
     public String getName() {
         return name;
