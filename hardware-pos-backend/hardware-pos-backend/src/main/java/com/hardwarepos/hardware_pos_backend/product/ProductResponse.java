@@ -29,6 +29,8 @@ public class ProductResponse {
     private final boolean active;
     private final LocalDateTime createdAt;
     private final LocalDateTime updatedAt;
+    private final String barcode;
+    private final Product.BarcodeType barcodeType;
 
     public ProductResponse(
             Long id,
@@ -49,7 +51,9 @@ public class ProductResponse {
             String location,
             boolean active,
             LocalDateTime createdAt,
-            LocalDateTime updatedAt
+            LocalDateTime updatedAt,
+            String barcode,
+            Product.BarcodeType barcodeType
     ) {
         this.id = id;
         this.productCode = productCode;
@@ -70,6 +74,8 @@ public class ProductResponse {
         this.active = active;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
+        this.barcode = barcode;
+        this.barcodeType = barcodeType;
     }
 
     public Long getId() {
@@ -78,6 +84,14 @@ public class ProductResponse {
 
     public String getProductCode() {
         return productCode;
+    }
+
+    public String getBarcode() {
+        return barcode;
+    }
+
+    public Product.BarcodeType getBarcodeType() {
+        return barcodeType;
     }
 
     public String getName() {

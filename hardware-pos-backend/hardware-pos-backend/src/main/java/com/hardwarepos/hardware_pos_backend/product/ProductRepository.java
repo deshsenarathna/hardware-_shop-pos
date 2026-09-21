@@ -8,5 +8,7 @@ public interface ProductRepository
     boolean existsByProductCodeIgnoreCase(String productCode);
 
     boolean existsByProductCodeIgnoreCaseAndIdNot( String productCode, Long id );
+
+    boolean  existsByBarcode(String barcode);
 }
 

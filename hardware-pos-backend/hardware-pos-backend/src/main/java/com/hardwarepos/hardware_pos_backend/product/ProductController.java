@@ -31,6 +31,16 @@ public class ProductController {
                 .body(response);
     }
 
+    @PostMapping("/{productId}/barcode/generate")
+    public ResponseEntity<ProductResponse> generateInternalBarcode(
+            @PathVariable Long productId
+    ) {
+        ProductResponse response =
+                productService.generateInternalBarcode(productId);
+
+        return ResponseEntity.ok(response);
+    }
+
     @GetMapping
     public ResponseEntity<List<ProductResponse>> getAllProducts() {
         return ResponseEntity.ok(

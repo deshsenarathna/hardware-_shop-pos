@@ -48,6 +48,14 @@ public class Product {
     )
     private String barcode;
 
+    @Enumerated(EnumType.STRING)
+    @Column(
+            name = "barcode_type",
+            nullable = false,
+            length = 20
+    )
+    private BarcodeType barcodeType = BarcodeType.NONE;
+
     @Column(nullable = false, length = 150)
     private String name;
 
@@ -115,6 +123,12 @@ public class Product {
     )
     private LocalDateTime updatedAt;
 
+    public enum BarcodeType {
+        EXTERNAL,
+        INTERNAL,
+        NONE
+    }
+
     public Product() {
     }
 
@@ -168,7 +182,19 @@ public class Product {
 
     public String getBarcode(){return barcode;}
 
-    public void setBarcode(String barcode) { this.barcode = barcode;}
+    public BarcodeType getBarcodeType(){
+        return barcodeType;
+    }
+
+      /*Handling Invariant situation*/
+    public void assignInternalBarcode(String generatedBarcode) {
+        if (generatedBarcode == null || generatedBarcode.isBlank()) {
+            throw new IllegalArgumentException("Generated barcode cannot be null or blank");
+        }
+        this.barcode = generatedBarcode;
+        this.barcodeType = BarcodeType.INTERNAL;
+    }
+
 
     public String getName() {
         return name;

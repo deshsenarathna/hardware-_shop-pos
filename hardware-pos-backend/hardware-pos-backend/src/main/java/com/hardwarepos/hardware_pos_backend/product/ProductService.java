@@ -18,25 +18,35 @@ import java.util.List;
 @Service
 public class ProductService {
 
+
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final BrandRepository brandRepository;
     private final MeasurementUnitRepository unitRepository;
     private final InventoryService inventoryService;
+    private final BarcodeGenerator barcodeGenerator;
+    private static final int MAX_BARCODE_GENERATION_ATTEMPTS = 5;
 
     public ProductService(
             ProductRepository productRepository,
             CategoryRepository categoryRepository,
             BrandRepository brandRepository,
             MeasurementUnitRepository unitRepository,
-            InventoryService inventoryService
+            InventoryService inventoryService,
+            BarcodeGenerator barcodeGenerator
     ) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
         this.brandRepository = brandRepository;
         this.unitRepository = unitRepository;
         this.inventoryService = inventoryService;
+        this.barcodeGenerator = barcodeGenerator;
+
     }
+
+
+
+
 
     @Transactional
     public ProductResponse createProduct(
@@ -44,6 +54,7 @@ public class ProductService {
     ) {
         String productCode =
                 request.getProductCode().trim().toUpperCase();
+
 
         String productName =
                 request.getName().trim();
@@ -108,6 +119,7 @@ public class ProductService {
             }
         }
 
+
         validateReorderLevel(
                 request.getReorderLevel(),
                 unit
@@ -139,12 +151,63 @@ public class ProductService {
         return convertToResponse(savedProduct);
     }
 
+    @Transactional
+    public ProductResponse generateInternalBarcode(Long productId){
+
+        Product product = productRepository
+                .findById(productId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Product was not found"
+                ));
+
+        if (!product.isActive()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Inactive product cannot be updated"
+            );
+        }
+
+        if (product.getBarcodeType() == Product.BarcodeType.EXTERNAL) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Product already has a manufacturer barcode and cannot have one generated"
+            );
+        }
+
+        String candidate = null;
+
+        for (int attempt = 1; attempt <= MAX_BARCODE_GENERATION_ATTEMPTS; attempt++) {
+            String next = barcodeGenerator.generateCandidate();
+
+            if (!productRepository.existsByBarcode(next)) {
+                candidate = next;
+                break;
+            }
+        }
+
+        if (candidate == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Unable to generate a unique barcode, please try again"
+            );
+        }
+
+        product.assignInternalBarcode(candidate);
+
+        Product savedProduct = productRepository.save(product);
+
+        return convertToResponse(savedProduct);
+
+
+    }
+
 
     @Transactional
     public ProductResponse updateProduct(
             Long productId,
-            UpdateProductRequest request
-    ) {
+            UpdateProductRequest request )
+    {
         Product product = productRepository
                 .findById(productId)
                 .orElseThrow(() -> new ResponseStatusException(
@@ -350,7 +413,9 @@ public class ProductService {
 
                 product.isActive(),
                 product.getCreatedAt(),
-                product.getUpdatedAt()
+                product.getUpdatedAt(),
+                product.getBarcode(),
+                product.getBarcodeType()
         );
     }
 }
