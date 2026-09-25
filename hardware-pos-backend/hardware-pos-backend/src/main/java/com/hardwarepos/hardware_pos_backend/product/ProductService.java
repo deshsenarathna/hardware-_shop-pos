@@ -151,56 +151,6 @@ public class ProductService {
         return convertToResponse(savedProduct);
     }
 
-    @Transactional
-    public ProductResponse generateInternalBarcode(Long productId){
-
-        Product product = productRepository
-                .findById(productId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Product was not found"
-                ));
-
-        if (!product.isActive()) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Inactive product cannot be updated"
-            );
-        }
-
-        if (product.getBarcodeType() == Product.BarcodeType.EXTERNAL) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "Product already has a manufacturer barcode and cannot have one generated"
-            );
-        }
-
-        String candidate = null;
-
-        for (int attempt = 1; attempt <= MAX_BARCODE_GENERATION_ATTEMPTS; attempt++) {
-            String next = barcodeGenerator.generateCandidate();
-
-            if (!productRepository.existsByBarcode(next)) {
-                candidate = next;
-                break;
-            }
-        }
-
-        if (candidate == null) {
-            throw new ResponseStatusException(
-                    HttpStatus.INTERNAL_SERVER_ERROR,
-                    "Unable to generate a unique barcode, please try again"
-            );
-        }
-
-        product.assignInternalBarcode(candidate);
-
-        Product savedProduct = productRepository.save(product);
-
-        return convertToResponse(savedProduct);
-
-
-    }
 
 
     @Transactional
@@ -414,8 +364,8 @@ public class ProductService {
                 product.isActive(),
                 product.getCreatedAt(),
                 product.getUpdatedAt(),
-                product.getBarcode(),
-                product.getBarcodeType()
+                product.getBarcode()
+
         );
     }
 }
