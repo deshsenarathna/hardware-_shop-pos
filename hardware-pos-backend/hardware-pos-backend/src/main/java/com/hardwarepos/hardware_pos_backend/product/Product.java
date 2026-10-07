@@ -170,6 +170,10 @@ public class Product {
 
     public String getBarcode(){return barcode;}
 
+    public void setBarcode(String barcode) {
+        this.barcode = barcode;
+    }
+
     public String getName() {
         return name;
     }
@@ -232,6 +236,10 @@ public class Product {
 
     public void setReorderLevel(BigDecimal reorderLevel) {
         this.reorderLevel = reorderLevel;
+    }
+
+    public String location() {
+        return location;
     }
 
     public String getLocation() {

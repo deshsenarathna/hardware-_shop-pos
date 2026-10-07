@@ -86,6 +86,19 @@ public class SecurityConfig {
                         ).hasAnyRole("OWNER", "MANAGER")
 
 
+                        .requestMatchers( HttpMethod.GET, "/api/barcodes/**"
+                        ).hasAnyRole("OWNER", "MANAGER", "CASHIER")
+
+                        .requestMatchers( HttpMethod.POST, "/api/barcodes/**"
+                        ).hasAnyRole("OWNER", "MANAGER")
+
+                        .requestMatchers( HttpMethod.PATCH, "/api/barcodes/**"
+                        ).hasAnyRole("OWNER", "MANAGER")
+
+                        .requestMatchers( HttpMethod.DELETE, "/api/barcodes/**"
+                        ).hasAnyRole("OWNER", "MANAGER")
+
+
                         .requestMatchers( HttpMethod.GET, "/api/inventory/**"
                         ).hasAnyRole("OWNER", "MANAGER", "CASHIER")
 

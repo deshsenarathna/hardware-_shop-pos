@@ -18,35 +18,25 @@ import java.util.List;
 @Service
 public class ProductService {
 
-
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final BrandRepository brandRepository;
     private final MeasurementUnitRepository unitRepository;
     private final InventoryService inventoryService;
-    private final BarcodeGenerator barcodeGenerator;
-    private static final int MAX_BARCODE_GENERATION_ATTEMPTS = 5;
 
     public ProductService(
             ProductRepository productRepository,
             CategoryRepository categoryRepository,
             BrandRepository brandRepository,
             MeasurementUnitRepository unitRepository,
-            InventoryService inventoryService,
-            BarcodeGenerator barcodeGenerator
+            InventoryService inventoryService
     ) {
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
         this.brandRepository = brandRepository;
         this.unitRepository = unitRepository;
         this.inventoryService = inventoryService;
-        this.barcodeGenerator = barcodeGenerator;
-
     }
-
-
-
-
 
     @Transactional
     public ProductResponse createProduct(
@@ -54,7 +44,6 @@ public class ProductService {
     ) {
         String productCode =
                 request.getProductCode().trim().toUpperCase();
-
 
         String productName =
                 request.getName().trim();
@@ -119,7 +108,6 @@ public class ProductService {
             }
         }
 
-
         validateReorderLevel(
                 request.getReorderLevel(),
                 unit
@@ -150,8 +138,6 @@ public class ProductService {
 
         return convertToResponse(savedProduct);
     }
-
-
 
     @Transactional
     public ProductResponse updateProduct(
@@ -310,7 +296,6 @@ public class ProductService {
 
         productRepository.save(product);
     }
-
 
     @Transactional(readOnly = true)
     public List<ProductResponse> getAllProducts() {
