@@ -33,6 +33,8 @@ import ShoppingCartOutlinedIcon from "@mui/icons-material/ShoppingCartOutlined";
 
 import apiClient from "../api/apiClient";
 
+const keepFocus = { onMouseDown: (e) => e.preventDefault() };
+
 const NUMPAD_DIGITS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 const PAYMENT_METHODS = [
@@ -60,8 +62,20 @@ function CashierPage() {
 
   const barcodeRef = useRef(null);
 
+  const keyHandlerRef = useRef(null);
+
   useEffect(() => {
     loadProducts();
+  }, []);
+
+  useEffect(() => {
+    keyHandlerRef.current = handleGlobalKeyDown;
+  });
+
+  useEffect(() => {
+    const listener = (e) => keyHandlerRef.current?.(e);
+    window.addEventListener("keydown", listener);
+    return () => window.removeEventListener("keydown", listener);
   }, []);
 
   async function loadProducts() {
@@ -163,18 +177,61 @@ function CashierPage() {
   }
 
   function handleNumpadClick(value) {
-    if (value === "clear") {
-      setPaymentReceived(0);
-    } else if (value === "backspace") {
-      setPaymentReceived((prev) => Math.floor(Number(prev) / 10));
-    } else if (value === ".") {
-      if (!paymentReceived.toString().includes(".")) {
-        setPaymentReceived(paymentReceived + ".");
+    setPaymentReceived((prev) => {
+      const current = String(prev);
+
+      if (value === "clear") return 0;
+
+      if (value === "backspace") {
+        const next = current.slice(0, -1);
+        return next === "" ? 0 : next;
       }
-    } else {
-      setPaymentReceived(
-        paymentReceived === 0 ? value : paymentReceived + value
-      );
+
+      if (value === ".") {
+        return current.includes(".") ? prev : current + ".";
+      }
+
+      // digits ("0".."9" or "00")
+      if (current.length >= 9) return prev;
+      if (current.includes(".") && current.split(".")[1].length >= 2) return prev;
+      if (current === "0") return value === "00" ? prev : value;
+
+      return current + value;
+    });
+  }
+
+  // Physical keyboard: digits/./Backspace drive the keypad, Enter closes the bill.
+  // Ignored while typing in a text field (barcode, search, discount) — press Esc to leave the field.
+  function handleGlobalKeyDown(e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+    const el = e.target;
+    const tag = el?.tagName;
+    const typing =
+      tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el?.isContentEditable;
+
+    if (typing) {
+      if (e.key === "Escape") el.blur();
+      return;
+    }
+
+    if (/^[0-9]$/.test(e.key)) {
+      e.preventDefault();
+      handleNumpadClick(e.key);
+    } else if (e.key === "." || e.key === ",") {
+      e.preventDefault();
+      handleNumpadClick(".");
+    } else if (e.key === "Backspace") {
+      e.preventDefault();
+      handleNumpadClick("backspace");
+    } else if (e.key === "Delete" || e.key === "Escape") {
+      e.preventDefault();
+      handleNumpadClick("clear");
+    } else if (e.key === "Enter") {
+      // a focused button/link handles Enter itself
+      if (tag === "BUTTON" || tag === "A" || e.repeat) return;
+      e.preventDefault();
+      if (cart.length > 0) handleCheckout();
     }
   }
 
@@ -190,16 +247,21 @@ function CashierPage() {
     }
 
     try {
-      const payload = cart.map((item) => ({
+      const payload = {
+        items: cart.map((item) => ({
         productId: item.id,
         quantity: item.quantity,
-      }));
+      })),
+        paymentMethod: paymentMethod,
+        paymentReceived: Number(paymentReceived),
+        discount: Number(discountInput || 0),
+      };
 
       await apiClient.post("/sales", payload);
       setFeedback({ severity: "success", message: "Sale completed successfully." });
       clearCart();
     } catch {
-      setFeedback({ severity: "success", message: "Sale completed (demo mode)." });
+      setFeedback({ severity: "error", message: "Sale not completed" });
       clearCart();
     }
   }
@@ -227,253 +289,271 @@ function CashierPage() {
   const change = calculateChange();
 
   return (
-    <Box sx={{ height: "100%", minHeight: 0, display: "flex", gap: 2.5 }}>
-      {/* LEFT — scan/search, cart, checkout footer */}
-      <Box
-        sx={{
-          flex: 1,
-          minWidth: 0,
-          minHeight: 0,
-          display: "flex",
-          flexDirection: "column",
-          gap: 2,
-        }}
-      >
-        {/* Scan + search toolbar — fixed height */}
-        <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, flexShrink: 0 }}>
-          <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-            <TextField
-              inputRef={barcodeRef}
-              fullWidth
-              size="small"
-              placeholder="Scan or type a product code, then press Enter"
-              value={barcode}
-              onChange={(e) => setBarcode(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleBarcodeConfirm();
-              }}
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <QrCode2RoundedIcon fontSize="small" />
-                    </InputAdornment>
-                  ),
-                },
-              }}
-            />
+    <Box sx={{ height: "100%", minHeight: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+      {/* TOP ROW — current sale details */}
+      <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, flexShrink: 0 }}>
+        <Stack
+          direction={{ xs: "column", md: "row" }}
+          spacing={{ xs: 2, md: 4 }}
+          alignItems={{ xs: "stretch", md: "center" }}
+          justifyContent="space-between"
+        >
+          <Stack direction="row" spacing={4} alignItems="center" flexWrap="wrap" rowGap={1}>
+            <Box>
+              <Typography variant="caption" color="text.secondary">
+                Items
+              </Typography>
+              <Typography variant="h6">{cartQuantity}</Typography>
+            </Box>
+
+            <Box>
+              <Typography variant="caption" color="text.secondary">
+                Subtotal
+              </Typography>
+              <Typography variant="h6">{money(calculateSubtotal())}</Typography>
+            </Box>
 
             <TextField
-              fullWidth
               size="small"
-              placeholder="Search products by name"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchRoundedIcon fontSize="small" />
-                    </InputAdornment>
-                  ),
-                },
-              }}
+              type="number"
+              label="Discount"
+              value={discountInput}
+              onChange={(e) => setDiscountInput(e.target.value)}
+              inputProps={{ min: 0, step: "0.01" }}
+              sx={{ width: 130 }}
             />
           </Stack>
-        </Paper>
 
-        {/* Search results — only takes space while searching */}
-        {searchQuery.trim() !== "" && (
+          <Stack direction="row" spacing={4} alignItems="center" flexWrap="wrap" rowGap={1}>
+            <Box>
+              <Typography variant="caption" color="text.secondary">
+                Payment received
+              </Typography>
+              <Typography variant="h6" color="primary.main">
+                {money(paymentReceived)}
+              </Typography>
+            </Box>
+
+            <Box sx={{ bgcolor: "rgba(46,125,70,0.08)", borderRadius: 2, px: 1.5, py: 0.75 }}>
+              <Typography variant="caption" color="text.secondary">
+                Change
+              </Typography>
+              <Typography variant="h6" color="success.main">
+                {money(change)}
+              </Typography>
+            </Box>
+
+            <Box sx={{ textAlign: "right" }}>
+              <Typography variant="caption" color="text.secondary">
+                Payment due
+              </Typography>
+              <Typography variant="h4" color="secondary.dark">
+                {money(total)}
+              </Typography>
+            </Box>
+          </Stack>
+        </Stack>
+      </Paper>
+
+      {/* BELOW — cart list + keypad */}
+      <Box sx={{ flex: 1, minHeight: 0, display: "flex", gap: 2.5 }}>
+        {/* LEFT — scan/search, cart list, actions */}
+        <Box
+          sx={{
+            flex: 1,
+            minWidth: 0,
+            minHeight: 0,
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+          }}
+        >
+          <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, flexShrink: 0 }}>
+            <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+              <TextField
+                inputRef={barcodeRef}
+                fullWidth
+                size="small"
+                placeholder="Scan or type a product code, then press Enter"
+                value={barcode}
+                onChange={(e) => setBarcode(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                  if (barcode.trim()) handleBarcodeConfirm();
+                  else if (cart.length > 0) handleCheckout();
+                }
+                }}
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <QrCode2RoundedIcon fontSize="small" />
+                      </InputAdornment>
+                    ),
+                  },
+                }}
+              />
+
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="Search products by name"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchRoundedIcon fontSize="small" />
+                      </InputAdornment>
+                    ),
+                  },
+                }}
+              />
+            </Stack>
+          </Paper>
+
+          {searchQuery.trim() !== "" && (
+            <Paper
+              variant="outlined"
+              sx={{ borderRadius: 3, flexShrink: 0, maxHeight: 220, overflow: "auto" }}
+            >
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Name</TableCell>
+                    <TableCell align="right">Cost</TableCell>
+                    <TableCell align="right">Price</TableCell>
+                    <TableCell align="right">Action</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {searchedProducts.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
+                        <Typography color="text.secondary" variant="body2">
+                          No products found.
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    searchedProducts.map((product) => (
+                      <TableRow key={product.id} hover>
+                        <TableCell>{product.name}</TableCell>
+                        <TableCell align="right">
+                          {product.purchasePrice != null ? money(product.purchasePrice) : "—"}
+                        </TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600 }}>
+                          {money(product.sellingPrice)}
+                        </TableCell>
+                        <TableCell align="right">
+                          <Button
+                            size="small"
+                            variant="contained"
+                            color="secondary"
+                            onClick={() => {
+                              addToCart(product);
+                              setSearchQuery("");
+                            }}
+                          >
+                            Add
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </Paper>
+          )}
+
+          {/* Cart list — fills remaining height, only region that scrolls */}
           <Paper
             variant="outlined"
             sx={{
+              flex: 1,
+              minHeight: 0,
               borderRadius: 3,
-              flexShrink: 0,
-              maxHeight: 220,
-              overflow: "auto",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
             }}
           >
-            <Table size="small" stickyHeader>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Name</TableCell>
-                  <TableCell align="right">Cost</TableCell>
-                  <TableCell align="right">Price</TableCell>
-                  <TableCell align="right">Action</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {searchedProducts.length === 0 ? (
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+              sx={{ flexShrink: 0, px: 2, py: 1.5, borderBottom: "1px solid", borderColor: "divider" }}
+            >
+              <Stack direction="row" spacing={1} alignItems="center">
+                <ShoppingCartOutlinedIcon fontSize="small" color="action" />
+                <Typography variant="subtitle1">Cart</Typography>
+              </Stack>
+              <Chip label={`${cartQuantity} item${cartQuantity === 1 ? "" : "s"}`} size="small" />
+            </Stack>
+
+            <TableContainer sx={{ flex: 1, minHeight: 0, overflow: "auto" }}>
+              <Table size="small" stickyHeader>
+                <TableHead>
                   <TableRow>
-                    <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
-                      <Typography color="text.secondary" variant="body2">
-                        No products found.
-                      </Typography>
-                    </TableCell>
+                    <TableCell>Item</TableCell>
+                    <TableCell align="right">Price</TableCell>
+                    <TableCell align="center">Qty</TableCell>
+                    <TableCell align="right">Line Total</TableCell>
+                    <TableCell align="right" />
                   </TableRow>
-                ) : (
-                  searchedProducts.map((product) => (
-                    <TableRow key={product.id} hover>
-                      <TableCell>{product.name}</TableCell>
-                      <TableCell align="right">
-                        {product.purchasePrice != null
-                          ? money(product.purchasePrice)
-                          : "—"}
-                      </TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600 }}>
-                        {money(product.sellingPrice)}
-                      </TableCell>
-                      <TableCell align="right">
-                        <Button
-                          size="small"
-                          variant="contained"
-                          color="secondary"
-                          onClick={() => {
-                            addToCart(product);
-                            setSearchQuery("");
-                          }}
-                        >
-                          Add
-                        </Button>
+                </TableHead>
+                <TableBody>
+                  {cart.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
+                        <Typography color="text.secondary">
+                          Cart is empty. Scan or search for a product to add it.
+                        </Typography>
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  ) : (
+                    cart.map((item) => (
+                      <TableRow key={item.id} hover>
+                        <TableCell>{item.name}</TableCell>
+                        <TableCell align="right">{money(item.price)}</TableCell>
+                        <TableCell align="center">
+                          <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
+                            <IconButton
+                              size="small"
+                              onClick={() => decreaseQty(item.id)}
+                              disabled={item.quantity <= 1}
+                            >
+                              <RemoveRoundedIcon fontSize="small" />
+                            </IconButton>
+                            <Typography sx={{ minWidth: 24, textAlign: "center" }}>
+                              {item.quantity}
+                            </Typography>
+                            <IconButton size="small" onClick={() => increaseQty(item.id)}>
+                              <AddRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </Stack>
+                        </TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600 }}>
+                          {money(item.price * item.quantity)}
+                        </TableCell>
+                        <TableCell align="right">
+                          <IconButton size="small" color="error" onClick={() => removeItem(item.id)}>
+                            <DeleteOutlineRoundedIcon fontSize="small" />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
           </Paper>
-        )}
 
-        {/* Cart — fills remaining height, only region that scrolls */}
-        <Paper
-          variant="outlined"
-          sx={{
-            flex: 1,
-            minHeight: 0,
-            borderRadius: 3,
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-          }}
-        >
-          <Stack
-            direction="row"
-            alignItems="center"
-            justifyContent="space-between"
-            sx={{
-              flexShrink: 0,
-              px: 2,
-              py: 1.5,
-              borderBottom: "1px solid",
-              borderColor: "divider",
-            }}
-          >
-            <Stack direction="row" spacing={1} alignItems="center">
-              <ShoppingCartOutlinedIcon fontSize="small" color="action" />
-              <Typography variant="subtitle1">Cart</Typography>
-            </Stack>
-            <Chip label={`${cartQuantity} item${cartQuantity === 1 ? "" : "s"}`} size="small" />
-          </Stack>
-
-          <TableContainer sx={{ flex: 1, minHeight: 0, overflow: "auto" }}>
-            <Table size="small" stickyHeader>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Item</TableCell>
-                  <TableCell align="right">Price</TableCell>
-                  <TableCell align="center">Qty</TableCell>
-                  <TableCell align="right">Line Total</TableCell>
-                  <TableCell align="right" />
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {cart.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
-                      <Typography color="text.secondary">
-                        Cart is empty. Scan or search for a product to add it.
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  cart.map((item) => (
-                    <TableRow key={item.id} hover>
-                      <TableCell>{item.name}</TableCell>
-                      <TableCell align="right">{money(item.price)}</TableCell>
-                      <TableCell align="center">
-                        <Stack
-                          direction="row"
-                          spacing={0.5}
-                          alignItems="center"
-                          justifyContent="center"
-                        >
-                          <IconButton
-                            size="small"
-                            onClick={() => decreaseQty(item.id)}
-                            disabled={item.quantity <= 1}
-                          >
-                            <RemoveRoundedIcon fontSize="small" />
-                          </IconButton>
-                          <Typography sx={{ minWidth: 24, textAlign: "center" }}>
-                            {item.quantity}
-                          </Typography>
-                          <IconButton size="small" onClick={() => increaseQty(item.id)}>
-                            <AddRoundedIcon fontSize="small" />
-                          </IconButton>
-                        </Stack>
-                      </TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600 }}>
-                        {money(item.price * item.quantity)}
-                      </TableCell>
-                      <TableCell align="right">
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => removeItem(item.id)}
-                        >
-                          <DeleteOutlineRoundedIcon fontSize="small" />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Paper>
-
-        {/* Checkout footer — fixed height */}
-        <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, flexShrink: 0 }}>
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            alignItems={{ xs: "stretch", sm: "center" }}
-            justifyContent="space-between"
-            spacing={2}
-          >
-            <Stack direction="row" spacing={4}>
-              <Box>
-                <Typography variant="caption" color="text.secondary">
-                  Quantity
-                </Typography>
-                <Typography variant="h6">{cartQuantity}</Typography>
-              </Box>
-              <Box>
-                <Typography variant="caption" color="text.secondary">
-                  Total
-                </Typography>
-                <Typography variant="h6" color="secondary.dark">
-                  {money(total)}
-                </Typography>
-              </Box>
-            </Stack>
-
-            <Stack direction="row" spacing={1.5}>
-              <Button
-                variant="outlined"
-                color="error"
-                onClick={clearCart}
-                sx={{ px: 2.5 }}
-              >
+          {/* Actions — fixed height */}
+          <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, flexShrink: 0 }}>
+            <Stack direction="row" spacing={1.5} justifyContent="flex-end">
+              <Button variant="outlined" color="error" onClick={clearCart} sx={{ px: 2.5 }}>
                 Clear
               </Button>
               <Button
@@ -494,72 +574,18 @@ function CashierPage() {
                 Charge
               </Button>
             </Stack>
-          </Stack>
-        </Paper>
-      </Box>
+          </Paper>
+        </Box>
 
-      {/* RIGHT — payment summary, keypad, payment method */}
-      <Box
-        sx={{
-          width: 320,
-          flexShrink: 0,
-          minHeight: 0,
-          display: "flex",
-          flexDirection: "column",
-          gap: 2,
-        }}
-      >
-        <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3, flexShrink: 0 }}>
-          <Stack spacing={1.5}>
-            <Box>
-              <Typography variant="caption" color="text.secondary">
-                Payment due
-              </Typography>
-              <Typography variant="h5">{money(total)}</Typography>
-            </Box>
-
-            <Box>
-              <Typography variant="caption" color="text.secondary">
-                Payment received
-              </Typography>
-              <Typography variant="h6" color="primary.main">
-                {money(paymentReceived)}
-              </Typography>
-            </Box>
-
-            <Box
-              sx={{
-                bgcolor: "rgba(46,125,70,0.08)",
-                borderRadius: 2,
-                p: 1.25,
-              }}
-            >
-              <Typography variant="caption" color="text.secondary">
-                Change
-              </Typography>
-              <Typography variant="h6" color="success.main">
-                {money(change)}
-              </Typography>
-            </Box>
-
-            <TextField
-              size="small"
-              type="number"
-              label="Discount"
-              value={discountInput}
-              onChange={(e) => setDiscountInput(e.target.value)}
-              inputProps={{ min: 0, step: "0.01" }}
-            />
-          </Stack>
-        </Paper>
-
+        {/* RIGHT — keypad, payment method */}
         <Paper
           variant="outlined"
           sx={{
+            width: 320,
+            flexShrink: 0,
+            minHeight: 0,
             p: 2.5,
             borderRadius: 3,
-            flex: 1,
-            minHeight: 0,
             overflow: "auto",
             display: "flex",
             flexDirection: "column",
@@ -567,8 +593,9 @@ function CashierPage() {
           }}
         >
           <Box>
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              Keypad
+            <Typography variant="subtitle2">Keypad</Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+              Type the amount on your keyboard · Enter = charge · Del = clear · Esc = leave a text field
             </Typography>
 
             <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, mb: 1 }}>
@@ -577,6 +604,7 @@ function CashierPage() {
                   key={num}
                   variant="outlined"
                   sx={{ py: 1.25, fontSize: 16, fontWeight: 600 }}
+                  {...keepFocus}
                   onClick={() => handleNumpadClick(num.toString())}
                 >
                   {num}
@@ -585,20 +613,24 @@ function CashierPage() {
             </Box>
 
             <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 1, mb: 1 }}>
-              <Button variant="outlined" sx={{ py: 1.25, fontWeight: 600 }} onClick={() => handleNumpadClick("0")}>
+              <Button variant="outlined" sx={{ py: 1.25, fontWeight: 600 }} {...keepFocus}
+                  onClick={() => handleNumpadClick("0")}>
                 0
               </Button>
-              <Button variant="outlined" sx={{ py: 1.25, fontWeight: 600 }} onClick={() => handleNumpadClick("00")}>
+              <Button variant="outlined" sx={{ py: 1.25, fontWeight: 600 }} {...keepFocus}
+                  onClick={() => handleNumpadClick("00")}>
                 00
               </Button>
-              <Button variant="outlined" sx={{ py: 1.25, fontWeight: 600 }} onClick={() => handleNumpadClick(".")}>
+              <Button variant="outlined" sx={{ py: 1.25, fontWeight: 600 }} {...keepFocus}
+                  onClick={() => handleNumpadClick(".")}>
                 .
               </Button>
               <Button
                 variant="outlined"
                 color="error"
                 sx={{ py: 1.25 }}
-                onClick={() => handleNumpadClick("backspace")}
+                {...keepFocus}
+                  onClick={() => handleNumpadClick("backspace")}
               >
                 <BackspaceOutlinedIcon fontSize="small" />
               </Button>
@@ -609,7 +641,8 @@ function CashierPage() {
                 variant="outlined"
                 color="error"
                 sx={{ py: 1.25, fontWeight: 600 }}
-                onClick={() => handleNumpadClick("clear")}
+                {...keepFocus}
+                  onClick={() => handleNumpadClick("clear")}
               >
                 Clear
               </Button>
@@ -617,6 +650,7 @@ function CashierPage() {
                 variant="contained"
                 color="secondary"
                 sx={{ py: 1.25, fontWeight: 600 }}
+                {...keepFocus}
                 onClick={handleCheckout}
                 disabled={cart.length === 0 || Number(paymentReceived) < total}
               >

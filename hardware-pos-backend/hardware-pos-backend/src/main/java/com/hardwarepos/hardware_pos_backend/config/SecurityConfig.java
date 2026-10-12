@@ -104,6 +104,13 @@ public class SecurityConfig {
 
                         .requestMatchers( HttpMethod.POST, "/api/inventory/**"
                         ).hasAnyRole("OWNER", "MANAGER")
+
+                        .requestMatchers( HttpMethod.GET, "/api/sales/**"
+                        ).hasAnyRole("OWNER", "MANAGER", "CASHIER")
+
+                        .requestMatchers( HttpMethod.POST, "/api/sales/**"
+                        ).hasAnyRole("OWNER", "MANAGER", "CASHIER")
+
                         // All other endpoints require authentication
                         .anyRequest()
                         .authenticated()
