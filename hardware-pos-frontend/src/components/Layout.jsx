@@ -31,6 +31,7 @@ import GroupOutlinedIcon from "@mui/icons-material/GroupOutlined";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import ConstructionRoundedIcon from "@mui/icons-material/ConstructionRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
+import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
 
 import { useAuth } from "../auth/AuthContext";
 
@@ -84,7 +85,14 @@ const NAV_ITEMS = [
     path: "/inventory",
     icon: Inventory2OutlinedIcon,
     roles: ["OWNER", "MANAGER",],
+  },
+  {
+    label: "All-Sales",
+    path: "/sales",
+    icon: PointOfSaleIcon,
+    roles: ["OWNER", "MANAGER",],
   }
+  
 ];
 
 function initialsFor(name) {

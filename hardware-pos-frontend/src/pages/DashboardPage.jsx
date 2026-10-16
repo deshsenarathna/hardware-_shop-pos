@@ -10,6 +10,7 @@ import {
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import PointOfSaleOutlinedIcon from "@mui/icons-material/PointOfSaleOutlined";
+import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 import CategoryOutlinedIcon from "@mui/icons-material/CategoryOutlined";
 import SellOutlinedIcon from "@mui/icons-material/SellOutlined";
@@ -27,6 +28,13 @@ const QUICK_LINKS = [
     path: "/new-sale",
     icon: PointOfSaleOutlinedIcon,
     roles: ["OWNER", "MANAGER", "CASHIER"],
+  },
+  {
+    label: "All Sales",
+    description: "Browse completed sales & invoices",
+    path: "/sales",
+    icon: ReceiptLongOutlinedIcon,
+    roles: ["OWNER", "MANAGER"],
   },
   {
     label: "Products",
@@ -104,14 +112,14 @@ function DashboardPage() {
   const [productCount, setProductCount] = useState(0);
   const [loadingStats, setLoadingStats] = useState(true);
 
-  useEffect(() => {
+   useEffect(() => {
     let isMounted = true;
 
     apiClient
       .get("/products")
       .then((response) => {
         if (!isMounted) return;
-        const products = response.data ?? [];
+        const products = response.data.content ?? [];
         setProductCount(products.filter((p) => p.active).length);
       })
       .catch(() => {
@@ -124,7 +132,7 @@ function DashboardPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, []); 
 
   const navigate = useNavigate();
   const links = QUICK_LINKS.filter((link) =>

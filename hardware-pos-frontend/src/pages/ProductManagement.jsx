@@ -32,8 +32,10 @@ import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import ToggleOffOutlinedIcon from "@mui/icons-material/ToggleOffOutlined";
 import ToggleOnOutlinedIcon from "@mui/icons-material/ToggleOnOutlined";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import QrCode2RoundedIcon from "@mui/icons-material/QrCode2Rounded";
 
 import apiClient from "../api/apiClient";
+import BarcodeDialog from "../components/BarcodeDialog";
 
 const initialFormData = {
   productCode: "",
@@ -64,6 +66,7 @@ function ProductManagementPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editingProductId, setEditingProductId] = useState(null);
+  const [barcodeProduct, setBarcodeProduct] = useState(null);
 
   useEffect(() => {
     loadPageData();
@@ -86,7 +89,7 @@ function ProductManagementPage() {
         apiClient.get("/units"),
       ]);
 
-      setProducts(productsResponse.data);
+      setProducts(productsResponse.data.content);
       setCategories(categoriesResponse.data.filter((c) => c.active));
       setBrands(brandsResponse.data.filter((b) => b.active));
       setUnits(unitsResponse.data.filter((u) => u.active));
@@ -391,6 +394,15 @@ function ProductManagementPage() {
                       />
                     </TableCell>
                     <TableCell align="right">
+                      <Tooltip title="Barcode">
+                        <IconButton
+                          size="small"
+                          onClick={() => setBarcodeProduct(product)}
+                        >
+                          <QrCode2RoundedIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+
                       <Tooltip title="Edit">
                         <IconButton
                           size="small"
@@ -613,6 +625,14 @@ function ProductManagementPage() {
       </Dialog>
 
       {/* Feedback — transient, never pushes the layout around */}
+      {barcodeProduct && (
+        <BarcodeDialog
+          key={barcodeProduct.id}
+          product={barcodeProduct}
+          onClose={() => setBarcodeProduct(null)}
+        />
+      )}
+
       <Snackbar
         open={Boolean(error)}
         autoHideDuration={5000}

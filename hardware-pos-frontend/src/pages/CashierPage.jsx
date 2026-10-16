@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Box,
   Button,
-  Chip,
-  Divider,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   IconButton,
   InputAdornment,
   Paper,
@@ -25,22 +27,16 @@ import RemoveRoundedIcon from "@mui/icons-material/RemoveRounded";
 import QrCode2RoundedIcon from "@mui/icons-material/QrCode2Rounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import PrintOutlinedIcon from "@mui/icons-material/PrintOutlined";
-import BackspaceOutlinedIcon from "@mui/icons-material/BackspaceOutlined";
 import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
 import CreditCardOutlinedIcon from "@mui/icons-material/CreditCardOutlined";
 import MoreHorizOutlinedIcon from "@mui/icons-material/MoreHorizOutlined";
-import ShoppingCartOutlinedIcon from "@mui/icons-material/ShoppingCartOutlined";
 
 import apiClient from "../api/apiClient";
 
-const keepFocus = { onMouseDown: (e) => e.preventDefault() };
-
-const NUMPAD_DIGITS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
-
 const PAYMENT_METHODS = [
-  { id: "cash", label: "Cash", icon: PaymentsOutlinedIcon },
-  { id: "card", label: "Card", icon: CreditCardOutlinedIcon },
-  { id: "other", label: "Other", icon: MoreHorizOutlinedIcon },
+  { id: "CASH", label: "Cash", icon: PaymentsOutlinedIcon },
+  { id: "CARD", label: "Card", icon: CreditCardOutlinedIcon },
+  { id: "OTHER", label: "Other", icon: MoreHorizOutlinedIcon },
 ];
 
 function money(value) {
@@ -54,34 +50,84 @@ function CashierPage() {
   const [barcode, setBarcode] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const [paymentReceived, setPaymentReceived] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState(null);
-  const [discountInput, setDiscountInput] = useState(0);
+  // Checkout modal state
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [modalPaymentReceived, setModalPaymentReceived] = useState("");
+  const [modalPaymentMethod, setModalPaymentMethod] = useState("CASH");
+  const [submitting, setSubmitting] = useState(false);
 
   const [feedback, setFeedback] = useState(null); // { severity, message }
 
   const barcodeRef = useRef(null);
-
-  const keyHandlerRef = useRef(null);
+  const paymentInputRef = useRef(null);
+  const checkoutOpenRef = useRef(false);
+  const cartRef = useRef([]);
 
   useEffect(() => {
+    checkoutOpenRef.current = checkoutOpen;
+  }, [checkoutOpen]);
+
+  useEffect(() => {
+    cartRef.current = cart;
+  }, [cart]);
+
+  useEffect(() => {
+
+    console.log("Product fetching effect executed");
     loadProducts();
+
+    return () => {
+    console.log("CashierPage effect cleanup");
+  };
   }, []);
 
+  // When checkout popup opens, focus and auto-select the payment input
   useEffect(() => {
-    keyHandlerRef.current = handleGlobalKeyDown;
-  });
+    if (checkoutOpen) {
+      setTimeout(() => {
+        paymentInputRef.current?.focus();
+        paymentInputRef.current?.select();
+      }, 50);
+    }
+  }, [checkoutOpen]);
 
+  // Global keydown listener: Enter triggers checkout modal when ready
   useEffect(() => {
-    const listener = (e) => keyHandlerRef.current?.(e);
-    window.addEventListener("keydown", listener);
-    return () => window.removeEventListener("keydown", listener);
+    function handleGlobalKeyDown(e) {
+      if (e.key !== "Enter") return;
+
+      // If modal is open, modal's own onKeyDown handles Enter to create sale
+      if (checkoutOpenRef.current) return;
+
+      const activeEl = document.activeElement;
+      const tag = activeEl?.tagName;
+
+      // Ignore if user is pressing Enter on a button/link
+      if (tag === "BUTTON" || tag === "A" || e.repeat) return;
+
+      // If typing in search box, don't trigger checkout
+      if (activeEl?.name === "searchQuery") return;
+
+      // If barcode input has text, user is pressing Enter to scan product
+      if (activeEl?.getAttribute("data-barcode") === "true" && activeEl.value?.trim()) {
+        return;
+      }
+
+      // If cart has items and barcode is empty or user is not typing another code
+      if (cartRef.current.length > 0) {
+        e.preventDefault();
+        openCheckoutModal();
+      }
+    }
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
   }, []);
 
   async function loadProducts() {
     try {
-      const res = await apiClient.get("/products");
-      setProducts(res.data.filter((p) => p.active !== false));
+      const res = await apiClient.get("/products/pos-lookup");
+      setProducts(res.data.content.filter((p) => p.active !== false));
     } catch {
       setProducts([
         { id: 1, name: "Kinder Chocolate Small Bars", purchasePrice: 25, sellingPrice: 28.6 },
@@ -121,9 +167,7 @@ function CashierPage() {
   function increaseQty(productId) {
     setCart((prev) =>
       prev.map((item) =>
-        item.id === productId
-          ? { ...item, quantity: item.quantity + 1 }
-          : item
+        item.id === productId ? { ...item, quantity: item.quantity + 1 } : item
       )
     );
   }
@@ -142,21 +186,12 @@ function CashierPage() {
     setCart((prev) => prev.filter((item) => item.id !== productId));
   }
 
-  function calculateSubtotal() {
-    return cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  function calculateSubtotal(items = cart) {
+    return items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   }
 
-  function calculateTotal() {
-    const subtotal = calculateSubtotal();
-    const itemDiscounts = cart.reduce(
-      (sum, item) => sum + item.discount * item.quantity,
-      0
-    );
-    return Math.max(0, subtotal - itemDiscounts - Number(discountInput || 0));
-  }
-
-  function calculateChange() {
-    return Math.max(0, Number(paymentReceived || 0) - calculateTotal());
+  function calculateTotal(items = cart) {
+    return calculateSubtotal(items);
   }
 
   function handleBarcodeConfirm() {
@@ -176,102 +211,79 @@ function CashierPage() {
     }
   }
 
-  function handleNumpadClick(value) {
-    setPaymentReceived((prev) => {
-      const current = String(prev);
-
-      if (value === "clear") return 0;
-
-      if (value === "backspace") {
-        const next = current.slice(0, -1);
-        return next === "" ? 0 : next;
-      }
-
-      if (value === ".") {
-        return current.includes(".") ? prev : current + ".";
-      }
-
-      // digits ("0".."9" or "00")
-      if (current.length >= 9) return prev;
-      if (current.includes(".") && current.split(".")[1].length >= 2) return prev;
-      if (current === "0") return value === "00" ? prev : value;
-
-      return current + value;
-    });
-  }
-
-  // Physical keyboard: digits/./Backspace drive the keypad, Enter closes the bill.
-  // Ignored while typing in a text field (barcode, search, discount) — press Esc to leave the field.
-  function handleGlobalKeyDown(e) {
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
-
-    const el = e.target;
-    const tag = el?.tagName;
-    const typing =
-      tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el?.isContentEditable;
-
-    if (typing) {
-      if (e.key === "Escape") el.blur();
+  function openCheckoutModal() {
+    const currentCart = cartRef.current;
+    if (!currentCart || currentCart.length === 0) {
+      setFeedback({ severity: "error", message: "Cart is empty." });
       return;
     }
-
-    if (/^[0-9]$/.test(e.key)) {
-      e.preventDefault();
-      handleNumpadClick(e.key);
-    } else if (e.key === "." || e.key === ",") {
-      e.preventDefault();
-      handleNumpadClick(".");
-    } else if (e.key === "Backspace") {
-      e.preventDefault();
-      handleNumpadClick("backspace");
-    } else if (e.key === "Delete" || e.key === "Escape") {
-      e.preventDefault();
-      handleNumpadClick("clear");
-    } else if (e.key === "Enter") {
-      // a focused button/link handles Enter itself
-      if (tag === "BUTTON" || tag === "A" || e.repeat) return;
-      e.preventDefault();
-      if (cart.length > 0) handleCheckout();
-    }
+    const currentTotal = calculateTotal(currentCart);
+    setModalPaymentReceived(currentTotal.toFixed(2));
+    setModalPaymentMethod("CASH");
+    setCheckoutOpen(true);
   }
 
-  async function handleCheckout() {
-    if (cart.length === 0) {
+  function closeCheckoutModal() {
+    setCheckoutOpen(false);
+    setTimeout(() => {
+      barcodeRef.current?.focus();
+    }, 100);
+  }
+
+  async function handleConfirmSale() {
+    const currentCart = cartRef.current;
+    if (!currentCart || currentCart.length === 0) {
       setFeedback({ severity: "error", message: "Cart is empty." });
       return;
     }
 
-    if (Number(paymentReceived) < calculateTotal()) {
-      setFeedback({ severity: "error", message: "Payment received is insufficient." });
+    const currentTotal = calculateTotal(currentCart);
+    const received = Number(modalPaymentReceived);
+
+    if (isNaN(received) || received < currentTotal) {
+      setFeedback({
+        severity: "error",
+        message: `Payment received must be at least ${money(currentTotal)}.`,
+      });
       return;
     }
 
+    setSubmitting(true);
     try {
       const payload = {
-        items: cart.map((item) => ({
-        productId: item.id,
-        quantity: item.quantity,
-      })),
-        paymentMethod: paymentMethod,
-        paymentReceived: Number(paymentReceived),
-        discount: Number(discountInput || 0),
+        items: currentCart.map((item) => ({
+          productId: item.id,
+          quantity: item.quantity,
+        })),
+        paymentMethod: modalPaymentMethod,
+        paymentReceived: received,
+        discount: 0,
+        tax: 0,
       };
 
-      await apiClient.post("/sales", payload);
-      setFeedback({ severity: "success", message: "Sale completed successfully." });
+      const res = await apiClient.post("/sales", payload);
+      setFeedback({
+        severity: "success",
+        message: `Sale completed! Invoice: ${res.data.invoiceNumber || "Success"}`,
+      });
+      setCheckoutOpen(false);
       clearCart();
-    } catch {
-      setFeedback({ severity: "error", message: "Sale not completed" });
-      clearCart();
+    } catch (err) {
+      const errorMsg =
+        err?.response?.data?.message || err?.message || "Sale could not be completed";
+      setFeedback({ severity: "error", message: errorMsg });
+    } finally {
+      setSubmitting(false);
     }
   }
 
   function clearCart() {
     setCart([]);
-    setPaymentReceived(0);
-    setDiscountInput(0);
-    setPaymentMethod(null);
     setBarcode("");
+    setSearchQuery("");
+    setTimeout(() => {
+      barcodeRef.current?.focus();
+    }, 100);
   }
 
   function handlePrint() {
@@ -286,415 +298,406 @@ function CashierPage() {
 
   const cartQuantity = cart.reduce((sum, item) => sum + item.quantity, 0);
   const total = calculateTotal();
-  const change = calculateChange();
+  const change = Math.max(0, Number(modalPaymentReceived || 0) - total);
 
   return (
-    <Box sx={{ height: "100%", minHeight: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-      {/* TOP ROW — current sale details */}
-      <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, flexShrink: 0 }}>
-        <Stack
-          direction={{ xs: "column", md: "row" }}
-          spacing={{ xs: 2, md: 4 }}
-          alignItems={{ xs: "stretch", md: "center" }}
-          justifyContent="space-between"
-        >
-          <Stack direction="row" spacing={4} alignItems="center" flexWrap="wrap" rowGap={1}>
-            <Box>
-              <Typography variant="caption" color="text.secondary">
-                Items
-              </Typography>
-              <Typography variant="h6">{cartQuantity}</Typography>
-            </Box>
-
-            <Box>
-              <Typography variant="caption" color="text.secondary">
-                Subtotal
-              </Typography>
-              <Typography variant="h6">{money(calculateSubtotal())}</Typography>
-            </Box>
+    <Box sx={{ height: "100%", minHeight: 0, display: "flex", gap: 2.5 }}>
+      {/* LEFT COLUMN — search bar + cart list */}
+      <Box
+        sx={{
+          flex: 1,
+          minWidth: 0,
+          minHeight: 0,
+          display: "flex",
+          flexDirection: "column",
+          gap: 2,
+        }}
+      >
+        {/* Scan + search inputs */}
+        <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, flexShrink: 0 }}>
+          <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+            <TextField
+              inputRef={barcodeRef}
+              fullWidth
+              size="small"
+              placeholder="Scan or type barcode/product code, then press Enter"
+              value={barcode}
+              onChange={(e) => setBarcode(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.stopPropagation();
+                  if (barcode.trim()) {
+                    handleBarcodeConfirm();
+                  } else if (cartRef.current.length > 0) {
+                    openCheckoutModal();
+                  }
+                }
+              }}
+              slotProps={{
+                htmlInput: {
+                  "data-barcode": "true",
+                },
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <QrCode2RoundedIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                },
+              }}
+            />
 
             <TextField
+              name="searchQuery"
+              fullWidth
               size="small"
-              type="number"
-              label="Discount"
-              value={discountInput}
-              onChange={(e) => setDiscountInput(e.target.value)}
-              inputProps={{ min: 0, step: "0.01" }}
-              sx={{ width: 130 }}
+              placeholder="Search products by name"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchRoundedIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                },
+              }}
             />
           </Stack>
+        </Paper>
 
-          <Stack direction="row" spacing={4} alignItems="center" flexWrap="wrap" rowGap={1}>
-            <Box>
-              <Typography variant="caption" color="text.secondary">
-                Payment received
-              </Typography>
-              <Typography variant="h6" color="primary.main">
-                {money(paymentReceived)}
-              </Typography>
-            </Box>
+        {/* Live product search dropdown */}
+        {searchQuery.trim() !== "" && (
+          <Paper
+            variant="outlined"
+            sx={{ borderRadius: 3, flexShrink: 0, maxHeight: 220, overflow: "auto" }}
+          >
+            <Table size="small" stickyHeader>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Name</TableCell>
+                  <TableCell align="right">Cost</TableCell>
+                  <TableCell align="right">Price</TableCell>
+                  <TableCell align="right">Action</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {searchedProducts.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
+                      <Typography color="text.secondary" variant="body2">
+                        No products found.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  searchedProducts.map((product) => (
+                    <TableRow key={product.id} hover>
+                      <TableCell>{product.name}</TableCell>
+                      <TableCell align="right">
+                        {product.purchasePrice != null ? money(product.purchasePrice) : "—"}
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>
+                        {money(product.sellingPrice)}
+                      </TableCell>
+                      <TableCell align="right">
+                        <Button
+                          size="small"
+                          variant="contained"
+                          color="secondary"
+                          onClick={() => {
+                            addToCart(product);
+                            setSearchQuery("");
+                          }}
+                        >
+                          Add
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </Paper>
+        )}
 
-            <Box sx={{ bgcolor: "rgba(46,125,70,0.08)", borderRadius: 2, px: 1.5, py: 0.75 }}>
-              <Typography variant="caption" color="text.secondary">
-                Change
-              </Typography>
-              <Typography variant="h6" color="success.main">
-                {money(change)}
-              </Typography>
-            </Box>
+        {/* Cart list — fills remaining height, only region that scrolls */}
+        <Paper
+          variant="outlined"
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            borderRadius: 3,
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+            sx={{
+              flexShrink: 0,
+              px: 2,
+              py: 1.5,
+              borderBottom: "1px solid",
+              borderColor: "divider",
+            }}
+          >
+            <Typography variant="subtitle1">Cart</Typography>
+            <Typography variant="body2" color="text.secondary">
+              {cartQuantity} item{cartQuantity === 1 ? "" : "s"}
+            </Typography>
+          </Stack>
 
-            <Box sx={{ textAlign: "right" }}>
-              <Typography variant="caption" color="text.secondary">
-                Payment due
-              </Typography>
-              <Typography variant="h4" color="secondary.dark">
-                {money(total)}
-              </Typography>
-            </Box>
+          <TableContainer sx={{ flex: 1, minHeight: 0 }}>
+            <Table size="small" stickyHeader>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Product</TableCell>
+                  <TableCell align="right">Unit Price</TableCell>
+                  <TableCell align="center">Quantity</TableCell>
+                  <TableCell align="right">Line Total</TableCell>
+                  <TableCell align="right" />
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {cart.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
+                      <Typography color="text.secondary">
+                        Cart is empty. Scan or search for a product to add it.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  cart.map((item) => (
+                    <TableRow key={item.id} hover>
+                      <TableCell>{item.name}</TableCell>
+                      <TableCell align="right">{money(item.price)}</TableCell>
+                      <TableCell align="center">
+                        <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
+                          <IconButton
+                            size="small"
+                            onClick={() => decreaseQty(item.id)}
+                            disabled={item.quantity <= 1}
+                          >
+                            <RemoveRoundedIcon fontSize="small" />
+                          </IconButton>
+                          <Typography sx={{ minWidth: 24, textAlign: "center" }}>
+                            {item.quantity}
+                          </Typography>
+                          <IconButton size="small" onClick={() => increaseQty(item.id)}>
+                            <AddRoundedIcon fontSize="small" />
+                          </IconButton>
+                        </Stack>
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>
+                        {money(item.price * item.quantity)}
+                      </TableCell>
+                      <TableCell align="right">
+                        <IconButton size="small" color="error" onClick={() => removeItem(item.id)}>
+                          <DeleteOutlineRoundedIcon fontSize="small" />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      </Box>
+
+      {/* RIGHT COLUMN — total amount section */}
+      <Paper
+        variant="outlined"
+        sx={{
+          width: 340,
+          flexShrink: 0,
+          minHeight: 0,
+          p: 2.5,
+          borderRadius: 3,
+          overflow: "auto",
+          display: "flex",
+          flexDirection: "column",
+          gap: 2,
+        }}
+      >
+        <Box>
+          <Typography variant="caption" color="text.secondary" fontSize="large">
+            Total amount
+          </Typography>
+          <Typography
+            variant="h3"
+            color="secondary.dark"
+            sx={{ fontWeight: 700, lineHeight: 1.15, wordBreak: "break-word" }}
+          >
+            {money(total)}
+          </Typography>
+        </Box>
+
+        <Stack spacing={1} sx={{ pt: 2, borderTop: "1px solid", borderColor: "divider" }}>
+          <Stack direction="row" justifyContent="space-between">
+            <Typography color="text.secondary">Total items</Typography>
+            <Typography sx={{ fontWeight: 600 }}>{cartQuantity}</Typography>
+          </Stack>
+          <Stack direction="row" justifyContent="space-between">
+            <Typography color="text.secondary">Subtotal</Typography>
+            <Typography sx={{ fontWeight: 600 }}>{money(calculateSubtotal())}</Typography>
+          </Stack>
+        </Stack>
+
+        {/* Actions — pinned to the bottom of the panel */}
+        <Stack spacing={1.5} sx={{ mt: "auto", pt: 1 }}>
+          <Button
+            fullWidth
+            size="large"
+            variant="contained"
+            color="secondary"
+            onClick={openCheckoutModal}
+            disabled={cart.length === 0}
+            sx={{ py: 1.5, fontSize: 16, fontWeight: 700 }}
+          >
+            Checkout (Enter)
+          </Button>
+
+          <Stack direction="row" spacing={1.5}>
+            <Button fullWidth variant="outlined" color="error" onClick={clearCart}>
+              Clear Cart
+            </Button>
+            <Button
+              fullWidth
+              variant="outlined"
+              startIcon={<PrintOutlinedIcon />}
+              onClick={handlePrint}
+            >
+              Print
+            </Button>
           </Stack>
         </Stack>
       </Paper>
 
-      {/* BELOW — cart list + keypad */}
-      <Box sx={{ flex: 1, minHeight: 0, display: "flex", gap: 2.5 }}>
-        {/* LEFT — scan/search, cart list, actions */}
-        <Box
-          sx={{
-            flex: 1,
-            minWidth: 0,
-            minHeight: 0,
-            display: "flex",
-            flexDirection: "column",
-            gap: 2,
-          }}
-        >
-          <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, flexShrink: 0 }}>
-            <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-              <TextField
-                inputRef={barcodeRef}
-                fullWidth
-                size="small"
-                placeholder="Scan or type a product code, then press Enter"
-                value={barcode}
-                onChange={(e) => setBarcode(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                  if (barcode.trim()) handleBarcodeConfirm();
-                  else if (cart.length > 0) handleCheckout();
-                }
-                }}
-                slotProps={{
-                  input: {
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <QrCode2RoundedIcon fontSize="small" />
-                      </InputAdornment>
-                    ),
-                  },
-                }}
-              />
+      {/* CHECKOUT / PAYMENT POPUP MODAL */}
+      <Dialog
+        open={checkoutOpen}
+        onClose={closeCheckoutModal}
+        maxWidth="xs"
+        fullWidth
+        slotProps={{
+          paper: {
+            sx: { borderRadius: 3, p: 1 },
+          },
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !submitting) {
+            e.preventDefault();
+            handleConfirmSale();
+          }
+        }}
+      >
+        <DialogTitle sx={{ pb: 1, fontWeight: 700 }}>
+          Complete Sale
+        </DialogTitle>
 
-              <TextField
-                fullWidth
-                size="small"
-                placeholder="Search products by name"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                slotProps={{
-                  input: {
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchRoundedIcon fontSize="small" />
-                      </InputAdornment>
-                    ),
-                  },
-                }}
-              />
-            </Stack>
-          </Paper>
-
-          {searchQuery.trim() !== "" && (
-            <Paper
-              variant="outlined"
-              sx={{ borderRadius: 3, flexShrink: 0, maxHeight: 220, overflow: "auto" }}
-            >
-              <Table size="small" stickyHeader>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Name</TableCell>
-                    <TableCell align="right">Cost</TableCell>
-                    <TableCell align="right">Price</TableCell>
-                    <TableCell align="right">Action</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {searchedProducts.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
-                        <Typography color="text.secondary" variant="body2">
-                          No products found.
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    searchedProducts.map((product) => (
-                      <TableRow key={product.id} hover>
-                        <TableCell>{product.name}</TableCell>
-                        <TableCell align="right">
-                          {product.purchasePrice != null ? money(product.purchasePrice) : "—"}
-                        </TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 600 }}>
-                          {money(product.sellingPrice)}
-                        </TableCell>
-                        <TableCell align="right">
-                          <Button
-                            size="small"
-                            variant="contained"
-                            color="secondary"
-                            onClick={() => {
-                              addToCart(product);
-                              setSearchQuery("");
-                            }}
-                          >
-                            Add
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </Paper>
-          )}
-
-          {/* Cart list — fills remaining height, only region that scrolls */}
-          <Paper
-            variant="outlined"
+        <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2.5, pt: 1 }}>
+          {/* Total Due Banner */}
+          <Box
             sx={{
-              flex: 1,
-              minHeight: 0,
-              borderRadius: 3,
-              display: "flex",
-              flexDirection: "column",
-              overflow: "hidden",
+              p: 2,
+              borderRadius: 2.5,
+              bgcolor: "secondary.50",
+              border: "1px solid",
+              borderColor: "secondary.light",
+              textAlign: "center",
             }}
           >
-            <Stack
-              direction="row"
-              alignItems="center"
-              justifyContent="space-between"
-              sx={{ flexShrink: 0, px: 2, py: 1.5, borderBottom: "1px solid", borderColor: "divider" }}
-            >
-              <Stack direction="row" spacing={1} alignItems="center">
-                <ShoppingCartOutlinedIcon fontSize="small" color="action" />
-                <Typography variant="subtitle1">Cart</Typography>
-              </Stack>
-              <Chip label={`${cartQuantity} item${cartQuantity === 1 ? "" : "s"}`} size="small" />
-            </Stack>
-
-            <TableContainer sx={{ flex: 1, minHeight: 0, overflow: "auto" }}>
-              <Table size="small" stickyHeader>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Item</TableCell>
-                    <TableCell align="right">Price</TableCell>
-                    <TableCell align="center">Qty</TableCell>
-                    <TableCell align="right">Line Total</TableCell>
-                    <TableCell align="right" />
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {cart.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
-                        <Typography color="text.secondary">
-                          Cart is empty. Scan or search for a product to add it.
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    cart.map((item) => (
-                      <TableRow key={item.id} hover>
-                        <TableCell>{item.name}</TableCell>
-                        <TableCell align="right">{money(item.price)}</TableCell>
-                        <TableCell align="center">
-                          <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
-                            <IconButton
-                              size="small"
-                              onClick={() => decreaseQty(item.id)}
-                              disabled={item.quantity <= 1}
-                            >
-                              <RemoveRoundedIcon fontSize="small" />
-                            </IconButton>
-                            <Typography sx={{ minWidth: 24, textAlign: "center" }}>
-                              {item.quantity}
-                            </Typography>
-                            <IconButton size="small" onClick={() => increaseQty(item.id)}>
-                              <AddRoundedIcon fontSize="small" />
-                            </IconButton>
-                          </Stack>
-                        </TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 600 }}>
-                          {money(item.price * item.quantity)}
-                        </TableCell>
-                        <TableCell align="right">
-                          <IconButton size="small" color="error" onClick={() => removeItem(item.id)}>
-                            <DeleteOutlineRoundedIcon fontSize="small" />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
-
-          {/* Actions — fixed height */}
-          <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, flexShrink: 0 }}>
-            <Stack direction="row" spacing={1.5} justifyContent="flex-end">
-              <Button variant="outlined" color="error" onClick={clearCart} sx={{ px: 2.5 }}>
-                Clear
-              </Button>
-              <Button
-                variant="outlined"
-                startIcon={<PrintOutlinedIcon />}
-                onClick={handlePrint}
-                sx={{ px: 2.5 }}
-              >
-                Print
-              </Button>
-              <Button
-                variant="contained"
-                color="secondary"
-                onClick={handleCheckout}
-                disabled={cart.length === 0}
-                sx={{ px: 3 }}
-              >
-                Charge
-              </Button>
-            </Stack>
-          </Paper>
-        </Box>
-
-        {/* RIGHT — keypad, payment method */}
-        <Paper
-          variant="outlined"
-          sx={{
-            width: 320,
-            flexShrink: 0,
-            minHeight: 0,
-            p: 2.5,
-            borderRadius: 3,
-            overflow: "auto",
-            display: "flex",
-            flexDirection: "column",
-            gap: 2,
-          }}
-        >
-          <Box>
-            <Typography variant="subtitle2">Keypad</Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
-              Type the amount on your keyboard · Enter = charge · Del = clear · Esc = leave a text field
+            <Typography variant="body2" color="text.secondary">
+              Total Amount Due
             </Typography>
-
-            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, mb: 1 }}>
-              {NUMPAD_DIGITS.map((num) => (
-                <Button
-                  key={num}
-                  variant="outlined"
-                  sx={{ py: 1.25, fontSize: 16, fontWeight: 600 }}
-                  {...keepFocus}
-                  onClick={() => handleNumpadClick(num.toString())}
-                >
-                  {num}
-                </Button>
-              ))}
-            </Box>
-
-            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 1, mb: 1 }}>
-              <Button variant="outlined" sx={{ py: 1.25, fontWeight: 600 }} {...keepFocus}
-                  onClick={() => handleNumpadClick("0")}>
-                0
-              </Button>
-              <Button variant="outlined" sx={{ py: 1.25, fontWeight: 600 }} {...keepFocus}
-                  onClick={() => handleNumpadClick("00")}>
-                00
-              </Button>
-              <Button variant="outlined" sx={{ py: 1.25, fontWeight: 600 }} {...keepFocus}
-                  onClick={() => handleNumpadClick(".")}>
-                .
-              </Button>
-              <Button
-                variant="outlined"
-                color="error"
-                sx={{ py: 1.25 }}
-                {...keepFocus}
-                  onClick={() => handleNumpadClick("backspace")}
-              >
-                <BackspaceOutlinedIcon fontSize="small" />
-              </Button>
-            </Box>
-
-            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 1 }}>
-              <Button
-                variant="outlined"
-                color="error"
-                sx={{ py: 1.25, fontWeight: 600 }}
-                {...keepFocus}
-                  onClick={() => handleNumpadClick("clear")}
-              >
-                Clear
-              </Button>
-              <Button
-                variant="contained"
-                color="secondary"
-                sx={{ py: 1.25, fontWeight: 600 }}
-                {...keepFocus}
-                onClick={handleCheckout}
-                disabled={cart.length === 0 || Number(paymentReceived) < total}
-              >
-                Enter
-              </Button>
-            </Box>
+            <Typography variant="h3" color="secondary.dark" sx={{ fontWeight: 800 }}>
+              {money(total)}
+            </Typography>
           </Box>
 
-          <Divider />
-
+          {/* Payment Method Selector */}
           <Box>
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              Payment method
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1, fontWeight: 600 }}>
+              Payment Method
             </Typography>
-
-            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1 }}>
-              {PAYMENT_METHODS.map((method) => {
-                const Icon = method.icon;
-                const selected = paymentMethod === method.id;
-
+            <Stack direction="row" spacing={1}>
+              {PAYMENT_METHODS.map((m) => {
+                const Icon = m.icon;
+                const isSelected = modalPaymentMethod === m.id;
                 return (
                   <Button
-                    key={method.id}
-                    variant={selected ? "contained" : "outlined"}
-                    color={selected ? "secondary" : "inherit"}
-                    onClick={() => setPaymentMethod(method.id)}
-                    sx={{
-                      py: 1.25,
-                      flexDirection: "column",
-                      gap: 0.5,
-                      fontSize: 11,
-                      fontWeight: 600,
-                    }}
+                    key={m.id}
+                    variant={isSelected ? "contained" : "outlined"}
+                    color={isSelected ? "secondary" : "inherit"}
+                    startIcon={<Icon />}
+                    onClick={() => setModalPaymentMethod(m.id)}
+                    sx={{ flex: 1, py: 1, fontWeight: 600 }}
                   >
-                    <Icon fontSize="small" />
-                    {method.label}
+                    {m.label}
                   </Button>
                 );
               })}
-            </Box>
+            </Stack>
           </Box>
-        </Paper>
-      </Box>
 
+          {/* Payment Received Input */}
+          <Box>
+            <TextField
+              inputRef={paymentInputRef}
+              fullWidth
+              label="Payment Received"
+              type="number"
+              value={modalPaymentReceived}
+              onChange={(e) => setModalPaymentReceived(e.target.value)}
+              inputProps={{ min: 0, step: "0.01" }}
+              helperText="Press Enter to complete sale"
+            />
+          </Box>
+
+          {/* Change Display */}
+          <Box
+            sx={{
+              p: 1.5,
+              borderRadius: 2,
+              bgcolor: "rgba(46,125,70,0.08)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+              Change to Return:
+            </Typography>
+            <Typography variant="h6" color="success.main" sx={{ fontWeight: 700 }}>
+              {money(change)}
+            </Typography>
+          </Box>
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={closeCheckoutModal} color="inherit" disabled={submitting}>
+            Cancel (Esc)
+          </Button>
+          <Button
+            variant="contained"
+            color="secondary"
+            onClick={handleConfirmSale}
+            disabled={submitting || Number(modalPaymentReceived) < total}
+            sx={{ px: 3, fontWeight: 700 }}
+          >
+            {submitting ? "Processing..." : "Complete Sale (Enter)"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Notifications / Feedback */}
       <Snackbar
         open={Boolean(feedback)}
         autoHideDuration={4000}
