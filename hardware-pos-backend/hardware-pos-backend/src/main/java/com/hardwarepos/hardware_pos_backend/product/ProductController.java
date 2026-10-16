@@ -1,5 +1,6 @@
 package com.hardwarepos.hardware_pos_backend.product;
 
+import com.hardwarepos.hardware_pos_backend.sales.PagedResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -31,15 +32,40 @@ public class ProductController {
                 .body(response);
     }
 
-
-
+    // ==========================================
+    // GET PRODUCTS (PAGINATED WITH OPTIONAL SEARCH)
+    // ==========================================
     @GetMapping
-    public ResponseEntity<List<ProductResponse>> getAllProducts() {
+    public ResponseEntity<PagedResponse<ProductResponse>> getProducts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String search
+    ) {
         return ResponseEntity.ok(
-                productService.getAllProducts()
+                productService.getProducts(page, size, search)
         );
     }
 
+    // ==========================================
+    // LIGHTWEIGHT POS CASHIER LOOKUP
+    // Excludes sensitive buying prices, reorder levels, audit timestamps
+    // ==========================================
+    @GetMapping("/pos-lookup")
+    public ResponseEntity<List<ProductSummaryResponse>> getProductsForPos() {
+        return ResponseEntity.ok(
+                productService.getProductsForPos()
+        );
+    }
+
+    // ==========================================
+    // BACKWARD-COMPATIBLE UNPAGINATED PRODUCTS (ALL)
+    // ==========================================
+//    @GetMapping("/all")
+//    public ResponseEntity<List<ProductResponse>> getAllProducts() {
+//        return ResponseEntity.ok(
+//                productService.getAllProducts()
+//        );
+//    }
 
     @PutMapping("/{productId}")
     public ResponseEntity<ProductResponse> updateProduct(
@@ -71,5 +97,4 @@ public class ProductController {
         productService.activateProduct(productId);
         return ResponseEntity.ok().build();
     }
-
 }

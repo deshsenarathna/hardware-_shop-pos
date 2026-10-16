@@ -7,6 +7,11 @@ import com.hardwarepos.hardware_pos_backend.category.CategoryRepository;
 import com.hardwarepos.hardware_pos_backend.unit.MeasurementUnit;
 import com.hardwarepos.hardware_pos_backend.unit.MeasurementUnitRepository;
 import com.hardwarepos.hardware_pos_backend.inventory.InventoryService;
+import com.hardwarepos.hardware_pos_backend.sales.PagedResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +22,10 @@ import java.util.List;
 
 @Service
 public class ProductService {
+
+    private static final int DEFAULT_PAGE = 0;
+    private static final int DEFAULT_SIZE = 20;
+    private static final int MAX_SIZE = 100;
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
@@ -303,6 +312,58 @@ public class ProductService {
                 .stream()
                 .map(this::convertToResponse)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProductSummaryResponse> getProductsForPos() {
+        return productRepository.findByActiveTrue()
+                .stream()
+                .map(ProductSummaryResponse::new)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public PagedResponse<ProductResponse> getProducts(int page, int size, String search) {
+        if (page < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Page index must not be less than zero");
+        }
+        if (size <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Page size must be greater than zero");
+        }
+        if (size > MAX_SIZE) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Page size cannot exceed maximum limit of " + MAX_SIZE
+            );
+        }
+
+        Sort sort = Sort.by(Sort.Direction.DESC, "id");
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        Page<Product> productPage;
+        if (search != null && !search.trim().isEmpty()) {
+            String term = search.trim();
+            productPage = productRepository.findByNameContainingIgnoreCaseOrProductCodeContainingIgnoreCase(
+                    term, term, pageable
+            );
+        } else {
+            productPage = productRepository.findAll(pageable);
+        }
+
+        List<ProductResponse> content = productPage.getContent()
+                .stream()
+                .map(this::convertToResponse)
+                .toList();
+
+        return new PagedResponse<>(
+                content,
+                productPage.getNumber(),
+                productPage.getSize(),
+                productPage.getTotalElements(),
+                productPage.getTotalPages(),
+                productPage.isFirst(),
+                productPage.isLast()
+        );
     }
 
     private void validateReorderLevel(

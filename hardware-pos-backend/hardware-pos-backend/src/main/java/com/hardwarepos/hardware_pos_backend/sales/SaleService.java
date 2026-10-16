@@ -6,6 +6,10 @@ import com.hardwarepos.hardware_pos_backend.product.Product;
 import com.hardwarepos.hardware_pos_backend.product.ProductRepository;
 import com.hardwarepos.hardware_pos_backend.user.AppUser;
 import com.hardwarepos.hardware_pos_backend.user.AppUserRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -16,6 +20,8 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,6 +30,10 @@ import java.util.stream.Collectors;
 
 @Service
 public class SaleService {
+
+    private static final int DEFAULT_PAGE = 0;
+    private static final int DEFAULT_SIZE = 20;
+    private static final int MAX_SIZE = 100;
 
     private final SaleRepository saleRepository;
     private final SaleItemRepository saleItemRepository;
@@ -45,7 +55,9 @@ public class SaleService {
         this.appUserRepository = appUserRepository;
     }
 
-    // ==========================================\n    // CREATE SALE WITH CASHIER USERNAME\n    // ==========================================
+    // ==========================================
+    // CREATE SALE WITH CASHIER USERNAME
+    // ==========================================
     @Transactional
     public SaleResponse createSale(CreateSaleRequest request, String cashierUsername) {
         // 1. Authenticate the cashier
@@ -223,19 +235,98 @@ public class SaleService {
         return toSaleResponse(savedSale, savedItems);
     }
 
-    // ==========================================\n    // OVERLOAD FOR CREATE SALE WITHOUT EXPLICIT CASHIER\n    // ==========================================
+    // ==========================================
+    // OVERLOAD FOR CREATE SALE WITHOUT EXPLICIT CASHIER
+    // ==========================================
     @Transactional
     public SaleResponse createSale(CreateSaleRequest request) {
         return createSale(request, (String) null);
     }
 
-    // ==========================================\n    // BACKWARD-COMPATIBLE OVERLOAD FOR LIST\n    // ==========================================
+    // ==========================================
+    // BACKWARD-COMPATIBLE OVERLOAD FOR LIST
+    // ==========================================
     @Transactional
     public SaleResponse createSale(List<SaleRequestItem> items) {
         return createSale(new CreateSaleRequest(items));
     }
 
-    // ==========================================\n    // READ SALES\n    // ==========================================
+    // ==========================================
+    // READ SALES WITH SERVER-SIDE PAGINATION & DATE FILTERING
+    // ==========================================
+    @Transactional(readOnly = true)
+    public PagedResponse<SaleResponse> getSales(
+            LocalDate date,
+            LocalDate startDate,
+            LocalDate endDate,
+            int page,
+            int size
+    ) {
+        // 1. Validate pagination parameters
+        if (page < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Page index must not be less than zero");
+        }
+        if (size <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Page size must be greater than zero");
+        }
+        if (size > MAX_SIZE) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Page size cannot exceed maximum limit of " + MAX_SIZE
+            );
+        }
+
+        // 2. Validate date range if both provided
+        if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Start date cannot be after end date");
+        }
+
+        // 3. Configure sorting: newest sales first (createdAt DESC), with id DESC as a stable secondary tie-breaker
+        Sort sort = Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id"));
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        // 4. Query database with pagination and date filter applied at SQL level
+        Page<Sale> salesPage;
+
+        if (date != null) {
+            // Single date filter: covers the entire 24-hour day
+            LocalDateTime startOfDay = date.atStartOfDay();
+            LocalDateTime endOfDay = date.atTime(LocalTime.MAX);
+            salesPage = saleRepository.findByCreatedAtBetween(startOfDay, endOfDay, pageable);
+        } else if (startDate != null || endDate != null) {
+            // Date range filter
+            LocalDateTime start = startDate != null ? startDate.atStartOfDay() : LocalDate.of(1970, 1, 1).atStartOfDay();
+            LocalDateTime end = endDate != null ? endDate.atTime(LocalTime.MAX) : LocalDate.of(2099, 12, 31).atTime(LocalTime.MAX);
+            salesPage = saleRepository.findByCreatedAtBetween(start, end, pageable);
+        } else {
+            // No date filter: retrieve all sales paginated
+            salesPage = saleRepository.findAll(pageable);
+        }
+
+        // 5. Map entities to SaleResponse DTOs only for the retrieved slice
+        List<SaleResponse> content = salesPage.getContent()
+                .stream()
+                .map(sale -> {
+                    List<SaleItem> items = saleItemRepository.findBySale(sale);
+                    return toSaleResponse(sale, items);
+                })
+                .collect(Collectors.toList());
+
+        // 6. Wrap in PagedResponse with pagination metadata
+        return new PagedResponse<>(
+                content,
+                salesPage.getNumber(),
+                salesPage.getSize(),
+                salesPage.getTotalElements(),
+                salesPage.getTotalPages(),
+                salesPage.isFirst(),
+                salesPage.isLast()
+        );
+    }
+
+    // ==========================================
+    // BACKWARD-COMPATIBLE UNPAGINATED READ
+    // ==========================================
     @Transactional(readOnly = true)
     public List<SaleResponse> getAllSales() {
         return saleRepository.findAllByOrderByCreatedAtDesc()
@@ -263,7 +354,9 @@ public class SaleService {
         return toSaleResponse(sale, items);
     }
 
-    // ==========================================\n    // DTO MAPPER\n    // ==========================================
+    // ==========================================
+    // DTO MAPPER
+    // ==========================================
     private SaleResponse toSaleResponse(Sale sale, List<SaleItem> items) {
         List<SaleItemResponse> itemResponses = items != null
                 ? items.stream().map(this::toSaleItemResponse).collect(Collectors.toList())
@@ -319,7 +412,9 @@ public class SaleService {
         );
     }
 
-    // ==========================================\n    // INVOICE GENERATOR\n    // ==========================================
+    // ==========================================
+    // INVOICE GENERATOR
+    // ==========================================
     private String generateInvoice() {
         String datePrefix = DateTimeFormatter.ofPattern("yyyyMMdd").format(LocalDate.now());
         String uniqueSuffix = UUID.randomUUID().toString().substring(0, 6).toUpperCase();
