@@ -112,16 +112,14 @@ function DashboardPage() {
   const [productCount, setProductCount] = useState(0);
   const [loadingStats, setLoadingStats] = useState(true);
 
-   useEffect(() => {
+  useEffect(() => {
     let isMounted = true;
 
-    apiClient
-      .get("/products")
-      .then((response) => {
-        if (!isMounted) return;
-        const products = response.data.content ?? [];
-        setProductCount(products.filter((p) => p.active).length);
-      })
+    apiClient.get("/products").then((response) => {
+      if (!isMounted) return;
+      // totalElements contains the true total count across all pages from MySQL
+      setProductCount(response.data.totalElements ?? response.data.content?.length ?? 0);
+    })
       .catch(() => {
         // Stats are a nice-to-have; a failed fetch shouldn't block the page.
       })
@@ -132,7 +130,7 @@ function DashboardPage() {
     return () => {
       isMounted = false;
     };
-  }, []); 
+  }, []);
 
   const navigate = useNavigate();
   const links = QUICK_LINKS.filter((link) =>

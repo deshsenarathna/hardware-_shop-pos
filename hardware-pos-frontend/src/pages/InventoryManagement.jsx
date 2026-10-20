@@ -1,8 +1,11 @@
+
 import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Box,
   Button,
+  Card,
+  CardContent,
   Chip,
   CircularProgress,
   Dialog,
@@ -14,6 +17,8 @@ import {
   Paper,
   Snackbar,
   Stack,
+  Tab,
+  Tabs,
   Table,
   TableBody,
   TableCell,
@@ -23,6 +28,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
@@ -35,49 +41,128 @@ const initialFormData = {
   notes: "",
 };
 
+// Inventory summary card
+function StatCard({ label, value, color = "default" }) {
+  return (
+    <Card
+      variant="outlined"
+      sx={{
+        height: "100%",
+        borderRadius: 3,
+        borderColor:
+          color === "warning" ? "warning.light" : "divider",
+      }}
+    >
+      <CardContent>
+        <Typography variant="body2" color="text.secondary">
+          {label}
+        </Typography>
+
+        <Typography
+          variant="h5"
+          sx={{
+            mt: 1,
+            fontWeight: 700,
+            color:
+              color === "warning"
+                ? "warning.main"
+                : "text.primary",
+            overflowWrap: "anywhere",
+          }}
+        >
+          {value}
+        </Typography>
+      </CardContent>
+    </Card>
+  );
+}
+
 function InventoryManagementPage() {
-  const [products, setProducts] = useState([]);
-  const [stockByProductId, setStockByProductId] = useState({});
+  const [inventoryItems, setInventoryItems] = useState([]);
+  const [metrics, setMetrics] = useState(null);
+
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+
+  const [page, setPage] = useState(0);
+  const [size] = useState(20);
+  const [totalElements, setTotalElements] = useState(0);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [feedback, setFeedback] = useState(null); // { severity, message }
+  const [feedback, setFeedback] = useState(null);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [activeProduct, setActiveProduct] = useState(null);
   const [formData, setFormData] = useState(initialFormData);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
+  // Load inventory whenever the search, status, or page changes.
   useEffect(() => {
-    loadPageData();
+    loadInventory();
+  }, [page, size, statusFilter, debouncedSearch]);
+
+  // load matrics data separately to avoid unnecessary re-rendering of the table when metrics change
+  useEffect(() => {
+    loadInventoryMatrics(); 
   }, []);
 
-  async function loadPageData() {
+  // debounce search input to avoid excessive API calls
+  useEffect(() => {
+    const debounceTimeout = setTimeout(() => {
+      setDebouncedSearch(searchTerm.trim());
+    }, 1000);
+    return () => clearTimeout(debounceTimeout);
+  }, [searchTerm]);
+
+  async function loadInventoryMatrics() {
+    try {
+      const metricsResponse = await apiClient.get("/inventory/metrics");
+      setMetrics(metricsResponse.data);
+    } catch (error) {
+      console.error("Failed to load inventory metrics:", error);
+    }
+  }
+
+  async function loadInventory() {
     setLoading(true);
 
     try {
-      const [productsResponse, stockResponse] = await Promise.all([
-        apiClient.get("/products"),
-        apiClient.get("/inventory/stock"),
+      const params = new URLSearchParams({
+        page: String(page),
+        size: String(size),
+        status: statusFilter,
+        search: debouncedSearch,
+      });
+
+      const [inventoryResponse, metricsResponse] = await Promise.all([
+        apiClient.get(`/inventory?${params.toString()}`),
+        //apiClient.get("/inventory/metrics"),
       ]);
 
-      setProducts(productsResponse.data.filter((p) => p.active));
+      const inventoryData = inventoryResponse.data;
 
-      const stockMap = {};
-      stockResponse.data.forEach((stock) => {
-        stockMap[stock.productId] = stock;
+      // Support a paginated response or a plain array.
+      const items = Array.isArray(inventoryData)
+        ? inventoryData
+        : inventoryData?.content ?? [];
+
+      setInventoryItems(items);
+
+      /* setTotalElements(
+        Array.isArray(inventoryData)
+          ? inventoryData.length
+          : inventoryData?.totalElements ?? items.length
+      ); */
+
+      //setMetrics(metricsResponse.data);
+    } catch (error) {
+      console.error("Failed to load inventory:", error);
+
+      setFeedback({
+        severity: "error",
+        message: "Failed to load inventory.",
       });
-      setStockByProductId(stockMap);
-    } catch (requestError) {
-      const status = requestError.response?.status;
-
-      if (status === 401) {
-        setFeedback({ severity: "error", message: "Your login session is invalid or expired." });
-      } else if (status === 403) {
-        setFeedback({ severity: "error", message: "You do not have permission to view inventory." });
-      } else {
-        setFeedback({ severity: "error", message: "Unable to load inventory information." });
-      }
     } finally {
       setLoading(false);
     }
@@ -97,70 +182,178 @@ function InventoryManagementPage() {
 
   function handleChange(event) {
     const { name, value } = event.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    setFormData((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
+
+    const quantity = Number(formData.quantity);
+
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      setFeedback({
+        severity: "error",
+        message: "Enter a quantity greater than zero.",
+      });
+      return;
+    }
+
+    if (!activeProduct) {
+      setFeedback({
+        severity: "error",
+        message: "Please select a product.",
+      });
+      return;
+    }
+
     setSaving(true);
 
     try {
-      const response = await apiClient.post("/inventory/add-stock", {
-        productId: activeProduct.id,
-        quantity: Number(formData.quantity),
+      const productId =
+        activeProduct.productId ??
+        activeProduct.product?.id ??
+        activeProduct.id;
+
+      await apiClient.post("/inventory/add-stock", {
+        productId,
+        quantity,
         notes: formData.notes,
       });
 
-      setStockByProductId((prev) => ({
-        ...prev,
-        [response.data.productId]: response.data,
-      }));
-
-      setFeedback({ severity: "success", message: "Stock added successfully." });
       closeDialog();
-    } catch (requestError) {
-      const status = requestError.response?.status;
+
+      setFeedback({
+        severity: "success",
+        message: "Stock added successfully.",
+      });
+
+      // Refresh the table and summary metrics after adding stock.
+      await loadInventory();
+    } catch (error) {
+      console.error("Failed to add stock:", error);
+
+      const status = error.response?.status;
 
       if (status === 400) {
         setFeedback({
           severity: "error",
-          message: requestError.response?.data?.message || "Please check the entered quantity.",
+          message:
+            error.response?.data?.message ||
+            "Please check the entered quantity.",
         });
       } else if (status === 403) {
-        setFeedback({ severity: "error", message: "You do not have permission to add stock." });
+        setFeedback({
+          severity: "error",
+          message: "You do not have permission to add stock.",
+        });
       } else {
-        setFeedback({ severity: "error", message: "Unable to add stock." });
+        setFeedback({
+          severity: "error",
+          message:
+            error.response?.data?.message ||
+            "Unable to add stock.",
+        });
       }
     } finally {
       setSaving(false);
     }
   }
 
+  // Normalize inventory responses for the table.
+  // Supports inventory entries containing a nested product or flat fields.
   const rows = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
+    return inventoryItems
+      .map((item) => {
+        const product = item.product ?? item;
 
-    return products
-      .map((product) => {
-        const stock = stockByProductId[product.id];
+        const productId =
+          item.productId ?? product.id ?? item.id;
+
+        const quantityOnHand = Number(
+          item.quantityOnHand ??
+            item.stock?.quantityOnHand ??
+            0
+        );
+
+        const reorderLevel = Number(
+          item.reorderLevel ??
+            product.reorderLevel ??
+            0
+        );
+
         return {
-          product,
-          quantityOnHand: stock ? Number(stock.quantityOnHand) : 0,
-          reorderLevel: Number(product.reorderLevel ?? 0),
+          product: {
+            ...product,
+            id: productId,
+            name:
+              item.productName ??
+              product.name ??
+              "Unnamed product",
+            productCode:
+              item.productCode ??
+              product.productCode ??
+              "—",
+            location:
+              item.location ??
+              product.location ??
+              "",
+          },
+          quantityOnHand,
+          reorderLevel,
         };
       })
-      .filter(
-        (row) =>
-          !term ||
-          row.product.name.toLowerCase().includes(term) ||
-          row.product.productCode.toLowerCase().includes(term)
-      );
-  }, [products, stockByProductId, searchTerm]);
+      .filter(({ product, quantityOnHand, reorderLevel }) => {
+        // Apply local status filtering as well.
+        if (
+          statusFilter === "LOW_STOCK" &&
+          (quantityOnHand <= 0 ||
+            quantityOnHand > reorderLevel)
+        ) {
+          return false;
+        }
 
-  const lowStockCount = rows.filter((r) => r.quantityOnHand <= r.reorderLevel).length;
+        if (
+          statusFilter === "OUT_OF_STOCK" &&
+          quantityOnHand > 0
+        ) {
+          return false;
+        }
+
+        // Apply local search filtering.
+        const term = searchTerm.trim().toLowerCase();
+
+        return (
+          !term ||
+          product.name.toLowerCase().includes(term) ||
+          product.productCode.toLowerCase().includes(term)
+        );
+      });
+  }, [inventoryItems, statusFilter, searchTerm]);
+
+  const lowStockCount = Number(metrics?.lowStockCount ?? 0);
+
+  const totalStockUnits = Number(
+    metrics?.totalStockUnits ?? 0
+  );
+
+  const totalInventoryValuation = Number(
+    metrics?.totalInventoryValuation ?? 0
+  );
 
   return (
-    <Box sx={{ height: "100%", minHeight: 0, display: "flex", flexDirection: "column" }}>
-      {/* Header — fixed height */}
+    <Box
+      sx={{
+        height: "100%",
+        minHeight: 0,
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      {/* Page header */}
       <Stack
         direction={{ xs: "column", sm: "row" }}
         alignItems={{ xs: "stretch", sm: "center" }}
@@ -169,8 +362,14 @@ function InventoryManagementPage() {
         sx={{ flexShrink: 0, mb: 2.5 }}
       >
         <Box>
-          <Typography variant="h4">Inventory</Typography>
-          <Typography color="text.secondary" sx={{ mt: 0.5 }}>
+          <Typography variant="h4">
+            Inventory
+          </Typography>
+
+          <Typography
+            color="text.secondary"
+            sx={{ mt: 0.5 }}
+          >
             Track stock levels and restock products as they run low.
           </Typography>
         </Box>
@@ -178,15 +377,48 @@ function InventoryManagementPage() {
         {lowStockCount > 0 && (
           <Chip
             icon={<WarningAmberRoundedIcon />}
-            label={`${lowStockCount} product${lowStockCount === 1 ? "" : "s"} at or below reorder level`}
-            color="error"
+            label={`${lowStockCount} low-stock product${
+              lowStockCount === 1 ? "" : "s"
+            }`}
+            color="warning"
             variant="outlined"
             sx={{ fontWeight: 600 }}
           />
         )}
       </Stack>
 
-      {/* Table region — fills remaining height, scrolls internally */}
+      {/* Inventory summary cards */}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: {
+            xs: "1fr",
+            sm: "repeat(2, 1fr)",
+            md: "repeat(3, 1fr)",
+          },
+          gap: 2,
+          mb: 2.5,
+          flexShrink: 0,
+        }}
+      >
+        <StatCard
+          label="Total Stock Units"
+          value={totalStockUnits.toLocaleString()}
+        />
+
+        <StatCard
+          label="Low Stock Alerts"
+          value={lowStockCount.toLocaleString()}
+          color="warning"
+        />
+
+        <StatCard
+          label="Inventory Valuation"
+          value={`Rs. ${totalInventoryValuation.toLocaleString()}`}
+        />
+      </Box>
+
+      {/* Inventory table and filters */}
       <Paper
         variant="outlined"
         sx={{
@@ -198,85 +430,213 @@ function InventoryManagementPage() {
           overflow: "hidden",
         }}
       >
-        <Box sx={{ flexShrink: 0, p: 2, borderBottom: "1px solid", borderColor: "divider" }}>
-          <TextField
-            size="small"
-            fullWidth
-            placeholder="Search by code or name"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            sx={{ maxWidth: 420 }}
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchRoundedIcon fontSize="small" />
-                  </InputAdornment>
-                ),
-              },
-            }}
-          />
+        {/* Search field and status tabs */}
+        <Box
+          sx={{
+            flexShrink: 0,
+            p: 2,
+            borderBottom: "1px solid",
+            borderColor: "divider",
+          }}
+        >
+          <Stack
+            direction={{ xs: "column", md: "row" }}
+            spacing={2}
+            alignItems={{ xs: "stretch", md: "center" }}
+            justifyContent="space-between"
+          >
+            <TextField
+              size="small"
+              placeholder="Search by code or name"
+              value={searchTerm}
+              onChange={(event) => {
+                setSearchTerm(event.target.value);
+                setPage(0);
+              }}
+              sx={{
+                maxWidth: 420,
+                width: "100%",
+              }}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchRoundedIcon fontSize="small" />
+                    </InputAdornment>
+                  ),
+                },
+              }}
+            />
+
+            <Tabs
+              value={statusFilter}
+              onChange={(event, value) => {
+                setStatusFilter(value);
+                setPage(0);
+              }}
+              variant="scrollable"
+              allowScrollButtonsMobile
+              aria-label="Inventory stock status"
+            >
+              <Tab
+                label="All Items"
+                value="ALL"
+              />
+
+              <Tab
+                label="Low Stock"
+                value="LOW_STOCK"
+              />
+
+              <Tab
+                label="Out of Stock"
+                value="OUT_OF_STOCK"
+              />
+            </Tabs>
+          </Stack>
         </Box>
 
+        {/* Inventory table */}
         {loading ? (
-          <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Box
+            sx={{
+              flex: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              minHeight: 180,
+            }}
+          >
             <CircularProgress />
           </Box>
         ) : (
-          <TableContainer sx={{ flex: 1, minHeight: 0, overflow: "auto" }}>
-            <Table size="small" stickyHeader sx={{ minWidth: 820 }}>
+          <TableContainer
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              overflow: "auto",
+            }}
+          >
+            <Table
+              size="small"
+              stickyHeader
+              sx={{ minWidth: 820 }}
+            >
               <TableHead>
                 <TableRow>
                   <TableCell>Code</TableCell>
                   <TableCell>Name</TableCell>
-                  <TableCell align="right">Quantity on Hand</TableCell>
-                  <TableCell align="right">Reorder Level</TableCell>
+                  <TableCell align="right">
+                    Quantity on Hand
+                  </TableCell>
+                  <TableCell align="right">
+                    Reorder Level
+                  </TableCell>
                   <TableCell>Location</TableCell>
                   <TableCell>Status</TableCell>
-                  <TableCell align="right">Actions</TableCell>
+                  <TableCell align="right">
+                    Actions
+                  </TableCell>
                 </TableRow>
               </TableHead>
 
               <TableBody>
-                {rows.map(({ product, quantityOnHand, reorderLevel }) => {
-                  const isLow = quantityOnHand <= reorderLevel;
+                {rows.map(
+                  ({
+                    product,
+                    quantityOnHand,
+                    reorderLevel,
+                  }) => {
+                    const isOutOfStock =
+                      quantityOnHand <= 0;
 
-                  return (
-                    <TableRow key={product.id} hover>
-                      <TableCell>{product.productCode}</TableCell>
-                      <TableCell>{product.name}</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600 }}>
-                        {quantityOnHand}
-                      </TableCell>
-                      <TableCell align="right">{reorderLevel}</TableCell>
-                      <TableCell>{product.location || "—"}</TableCell>
-                      <TableCell>
-                        <Chip
-                          label={isLow ? "Low stock" : "In stock"}
-                          size="small"
-                          color={isLow ? "error" : "success"}
-                          variant={isLow ? "filled" : "outlined"}
-                        />
-                      </TableCell>
-                      <TableCell align="right">
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          startIcon={<AddRoundedIcon />}
-                          onClick={() => openAddStockDialog(product)}
+                    const isLow =
+                      !isOutOfStock &&
+                      quantityOnHand <= reorderLevel;
+
+                    return (
+                      <TableRow
+                        key={product.id}
+                        hover
+                      >
+                        <TableCell>
+                          {product.productCode}
+                        </TableCell>
+
+                        <TableCell>
+                          {product.name}
+                        </TableCell>
+
+                        <TableCell
+                          align="right"
+                          sx={{ fontWeight: 600 }}
                         >
-                          Add Stock
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                          {quantityOnHand.toLocaleString()}
+                        </TableCell>
+
+                        <TableCell align="right">
+                          {reorderLevel.toLocaleString()}
+                        </TableCell>
+
+                        <TableCell>
+                          {product.location || "—"}
+                        </TableCell>
+
+                        <TableCell>
+                          <Chip
+                            label={
+                              isOutOfStock
+                                ? "Out of stock"
+                                : isLow
+                                  ? "Low stock"
+                                  : "In stock"
+                            }
+                            size="small"
+                            color={
+                              isOutOfStock || isLow
+                                ? "error"
+                                : "success"
+                            }
+                            variant={
+                              isOutOfStock || isLow
+                                ? "filled"
+                                : "outlined"
+                            }
+                          />
+                        </TableCell>
+
+                        <TableCell align="right">
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<AddRoundedIcon />}
+                            onClick={() =>
+                              openAddStockDialog(product)
+                            }
+                          >
+                            Add Stock
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  }
+                )}
 
                 {rows.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} align="center" sx={{ py: 5 }}>
+                    <TableCell
+                      colSpan={7}
+                      align="center"
+                      sx={{ py: 5 }}
+                    >
                       <Typography color="text.secondary">
-                        {searchTerm ? "No products match your search." : "No active products found."}
+                        {searchTerm
+                          ? "No products match your search."
+                          : statusFilter === "LOW_STOCK"
+                            ? "No low-stock products found."
+                            : statusFilter === "OUT_OF_STOCK"
+                              ? "No out-of-stock products found."
+                              : "No inventory items found."}
                       </Typography>
                     </TableCell>
                   </TableRow>
@@ -285,28 +645,76 @@ function InventoryManagementPage() {
             </Table>
           </TableContainer>
         )}
+
+        {/* Pagination information */}
+        {!loading && totalElements > 0 && (
+          <Box
+            sx={{
+              p: 1.5,
+              borderTop: "1px solid",
+              borderColor: "divider",
+            }}
+          >
+            <Typography
+              variant="body2"
+              color="text.secondary"
+            >
+              Showing {rows.length} item(s) on this page
+              {" · "}
+              {totalElements} total matching item(s)
+            </Typography>
+          </Box>
+        )}
       </Paper>
 
       {/* Add stock dialog */}
-      <Dialog open={dialogOpen} onClose={closeDialog} fullWidth maxWidth="xs">
-        <DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <Dialog
+        open={dialogOpen}
+        onClose={closeDialog}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
           Add Stock
-          <IconButton onClick={closeDialog} size="small">
+
+          <IconButton
+            onClick={closeDialog}
+            size="small"
+            aria-label="Close dialog"
+          >
             <CloseRoundedIcon fontSize="small" />
           </IconButton>
         </DialogTitle>
 
-        <Box component="form" onSubmit={handleSubmit}>
+        <Box
+          component="form"
+          onSubmit={handleSubmit}
+        >
           <DialogContent dividers>
             <Stack spacing={2}>
               <Box>
-                <Typography variant="subtitle2">{activeProduct?.name}</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {activeProduct?.productCode} · Currently{" "}
-                  {activeProduct ? stockByProductId[activeProduct.id]?.quantityOnHand ?? 0 : 0} on hand
+                <Typography variant="subtitle2">
+                  {activeProduct?.name}
                 </Typography>
+
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                >
+                  {activeProduct?.productCode}
+                </Typography>
+
                 {activeProduct?.location && (
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                  >
                     Location: {activeProduct.location}
                   </Typography>
                 )}
@@ -321,7 +729,12 @@ function InventoryManagementPage() {
                 name="quantity"
                 value={formData.quantity}
                 onChange={handleChange}
-                inputProps={{ min: 0.001, step: "0.001" }}
+                slotProps={{
+                  htmlInput: {
+                    min: 0.001,
+                    step: 0.001,
+                  },
+                }}
               />
 
               <TextField
@@ -338,22 +751,44 @@ function InventoryManagementPage() {
           </DialogContent>
 
           <DialogActions sx={{ px: 3, py: 2 }}>
-            <Button onClick={closeDialog}>Cancel</Button>
-            <Button type="submit" variant="contained" color="secondary" disabled={saving}>
-              {saving ? <CircularProgress size={22} /> : "Add Stock"}
+            <Button
+              onClick={closeDialog}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+
+            <Button
+              type="submit"
+              variant="contained"
+              color="secondary"
+              disabled={saving}
+            >
+              {saving ? (
+                <CircularProgress size={22} />
+              ) : (
+                "Add Stock"
+              )}
             </Button>
           </DialogActions>
         </Box>
       </Dialog>
 
+      {/* Success and error messages */}
       <Snackbar
         open={Boolean(feedback)}
         autoHideDuration={4000}
         onClose={() => setFeedback(null)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        anchorOrigin={{
+          vertical: "bottom",
+          horizontal: "center",
+        }}
       >
         {feedback ? (
-          <Alert severity={feedback.severity} onClose={() => setFeedback(null)}>
+          <Alert
+            severity={feedback.severity}
+            onClose={() => setFeedback(null)}
+          >
             {feedback.message}
           </Alert>
         ) : undefined}

@@ -125,23 +125,18 @@ function CashierPage() {
   }, []);
 
   async function loadProducts() {
-    try {
-      const res = await apiClient.get("/products/pos-lookup");
-      setProducts(res.data.content.filter((p) => p.active !== false));
-    } catch {
-      setProducts([
-        { id: 1, name: "Kinder Chocolate Small Bars", purchasePrice: 25, sellingPrice: 28.6 },
-        { id: 2, name: "Coca Cola 500ml", purchasePrice: 40, sellingPrice: 50 },
-        { id: 3, name: "Bread Loaf", purchasePrice: 30, sellingPrice: 35 },
-        { id: 4, name: "Milk 1L", purchasePrice: 45, sellingPrice: 55 },
-        { id: 5, name: "Eggs Dozen", purchasePrice: 80, sellingPrice: 120 },
-      ]);
-      setFeedback({
-        severity: "info",
-        message: "Showing sample products — could not reach the server.",
-      });
-    }
+  try {
+    const res = await apiClient.get("/products/pos-lookup");
+    // Directly set the array (already filtered for active products by the backend)
+    const productList = Array.isArray(res.data) ? res.data : (res.data.content || []);
+    setProducts(productList);
+  } catch (error) {
+    setFeedback({
+      severity: "error",
+      message: "Could not load products from server.",
+    });
   }
+}
 
   function addToCart(product) {
     const existing = cart.find((c) => c.id === product.id);
