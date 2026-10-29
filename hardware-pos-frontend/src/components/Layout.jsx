@@ -32,6 +32,7 @@ import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import ConstructionRoundedIcon from "@mui/icons-material/ConstructionRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
+import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined';
 
 import { useAuth } from "../auth/AuthContext";
 
@@ -69,6 +70,12 @@ const NAV_ITEMS = [
     roles: ["OWNER", "MANAGER"],
   },
   {
+    label: "Suppliers",
+    path: "/suppliers",
+    icon: LocalShippingOutlinedIcon,
+    roles: ["OWNER", "MANAGER"],
+  },
+  {
     label: "Units",
     path: "/units",
     icon: StraightenOutlinedIcon,
@@ -84,15 +91,20 @@ const NAV_ITEMS = [
     label: "Inventory",
     path: "/inventory",
     icon: Inventory2OutlinedIcon,
-    roles: ["OWNER", "MANAGER",],
+    roles: ["OWNER", "MANAGER"],
   },
   {
     label: "All-Sales",
     path: "/sales",
     icon: PointOfSaleIcon,
-    roles: ["OWNER", "MANAGER",],
+    roles: ["OWNER", "MANAGER"],
+  },
+  {
+    label: "Purchase Orders",
+    path: "/purchase-orders",
+    icon: LocalShippingOutlinedIcon,
+    roles: ["OWNER", "MANAGER"],
   }
-  
 ];
 
 function initialsFor(name) {

@@ -1,8 +1,13 @@
 package com.hardwarepos.hardware_pos_backend.inventory;
 
+import com.hardwarepos.hardware_pos_backend.inventory.dto.AdjustStockRequest;
+import com.hardwarepos.hardware_pos_backend.inventory.dto.InventoryMetricsResponse;
+import com.hardwarepos.hardware_pos_backend.inventory.dto.StockTransactionResponse;
+import com.hardwarepos.hardware_pos_backend.inventory.dto.InventoryItemResponse;
+
 import com.hardwarepos.hardware_pos_backend.product.Product;
 import com.hardwarepos.hardware_pos_backend.product.ProductRepository;
-import com.hardwarepos.hardware_pos_backend.sales.PagedResponse;
+import com.hardwarepos.hardware_pos_backend.sales.dto.PagedResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;

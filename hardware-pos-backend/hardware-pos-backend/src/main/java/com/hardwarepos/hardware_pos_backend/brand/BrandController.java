@@ -1,5 +1,8 @@
 package com.hardwarepos.hardware_pos_backend.brand;
 
+import com.hardwarepos.hardware_pos_backend.brand.dto.BrandResponse;
+import com.hardwarepos.hardware_pos_backend.brand.dto.BrandRequest;
+
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

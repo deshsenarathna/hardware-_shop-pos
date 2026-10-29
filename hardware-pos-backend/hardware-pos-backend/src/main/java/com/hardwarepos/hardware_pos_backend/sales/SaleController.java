@@ -1,5 +1,9 @@
 package com.hardwarepos.hardware_pos_backend.sales;
 
+import com.hardwarepos.hardware_pos_backend.sales.dto.SaleResponse;
+import com.hardwarepos.hardware_pos_backend.sales.dto.CreateSaleRequest;
+import com.hardwarepos.hardware_pos_backend.sales.dto.PagedResponse;
+
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;

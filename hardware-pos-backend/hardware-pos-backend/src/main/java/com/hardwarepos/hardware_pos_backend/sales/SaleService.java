@@ -1,5 +1,11 @@
 package com.hardwarepos.hardware_pos_backend.sales;
 
+import com.hardwarepos.hardware_pos_backend.sales.dto.SaleItemResponse;
+import com.hardwarepos.hardware_pos_backend.sales.dto.SaleRequestItem;
+import com.hardwarepos.hardware_pos_backend.sales.dto.SaleResponse;
+import com.hardwarepos.hardware_pos_backend.sales.dto.CreateSaleRequest;
+import com.hardwarepos.hardware_pos_backend.sales.dto.PagedResponse;
+
 import com.hardwarepos.hardware_pos_backend.inventory.InventoryService;
 import com.hardwarepos.hardware_pos_backend.inventory.StockTransactionType;
 import com.hardwarepos.hardware_pos_backend.product.Product;

@@ -32,15 +32,6 @@ public class Supplier {
     @Column(nullable = false, length = 25)
     private String phone;
 
-    @Column(length = 100)
-    private String email;
-
-    @Column(length = 255)
-    private String address;
-
-    @Column(name = "tax_identifier", length = 50)
-    private String taxIdentifier;
-
     @Column(nullable = false)
     private boolean active = true;
 
@@ -53,14 +44,11 @@ public class Supplier {
     public Supplier() {
     }
 
-    public Supplier(String supplierCode, String name, String contactPerson, String phone, String email, String address, String taxIdentifier) {
+    public Supplier(String supplierCode, String name, String contactPerson, String phone) {
         this.supplierCode = supplierCode;
         this.name = name;
         this.contactPerson = contactPerson;
         this.phone = phone;
-        this.email = email;
-        this.address = address;
-        this.taxIdentifier = taxIdentifier;
     }
 
     @PrePersist
@@ -109,30 +97,6 @@ public class Supplier {
 
     public void setPhone(String phone) {
         this.phone = phone;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public String getAddress() {
-        return address;
-    }
-
-    public void setAddress(String address) {
-        this.address = address;
-    }
-
-    public String getTaxIdentifier() {
-        return taxIdentifier;
-    }
-
-    public void setTaxIdentifier(String taxIdentifier) {
-        this.taxIdentifier = taxIdentifier;
     }
 
     public boolean isActive() {

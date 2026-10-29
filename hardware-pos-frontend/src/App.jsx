@@ -19,6 +19,8 @@ import ProductManagementPage from "./pages/ProductManagement.jsx";
 import CashierPage from "./pages/CashierPage.jsx";
 import InventoryManagement from "./pages/InventoryManagement.jsx";
 import SalesManagementPage from "./pages/SalesManagement.jsx";
+import SupplierManagementPage from "./pages/SupplierManagement.jsx";
+import PurchaseManagementPage from "./pages/PurchaseManagement.jsx";
 
 function App() {
   const { isAuthenticated } = useAuth();
@@ -82,6 +84,15 @@ function App() {
         />
 
         <Route
+          path="/suppliers"
+          element={
+            <RoleRoute allowedRoles={["OWNER", "MANAGER"]}>
+              <SupplierManagementPage />
+            </RoleRoute>
+          }
+        />
+
+        <Route
           path="/products"
           element={
             <RoleRoute allowedRoles={["OWNER", "MANAGER"]}>
@@ -102,7 +113,7 @@ function App() {
         <Route
           path="/sales"
           element={
-            <RoleRoute allowedRoles={["OWNER", "MANAGER",]}>
+            <RoleRoute allowedRoles={["OWNER", "MANAGER"]}>
               <SalesManagementPage />
             </RoleRoute>
           }
@@ -116,6 +127,16 @@ function App() {
             </RoleRoute>
           }
         />
+
+        <Route
+          path="/purchase-orders"
+          element={
+            <RoleRoute allowedRoles={["OWNER", "MANAGER"]}>
+              <PurchaseManagementPage />
+            </RoleRoute>
+          }
+        />
+
       </Route>
 
       <Route

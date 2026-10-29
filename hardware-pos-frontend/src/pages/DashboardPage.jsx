@@ -17,6 +17,7 @@ import SellOutlinedIcon from "@mui/icons-material/SellOutlined";
 import StraightenOutlinedIcon from "@mui/icons-material/StraightenOutlined";
 import GroupOutlinedIcon from "@mui/icons-material/GroupOutlined";
 import TrendingUpRoundedIcon from "@mui/icons-material/TrendingUpRounded";
+import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined";
 
 import { useAuth } from "../auth/AuthContext";
 import apiClient from "../api/apiClient";
@@ -55,6 +56,13 @@ const QUICK_LINKS = [
     description: "Maintain supplier brands",
     path: "/brands",
     icon: SellOutlinedIcon,
+    roles: ["OWNER", "MANAGER"],
+  },
+  {
+    label: "Suppliers",
+    description: "Manage vendor contacts & profiles",
+    path: "/suppliers",
+    icon: LocalShippingOutlinedIcon,
     roles: ["OWNER", "MANAGER"],
   },
   {

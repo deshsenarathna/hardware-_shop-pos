@@ -33,4 +33,21 @@ public interface PurchaseRepository extends JpaRepository<Purchase, Long> {
     Page<Purchase> findBySupplierIdAndPurchaseDateBetween(Long supplierId, LocalDate startDate, LocalDate endDate, Pageable pageable);
 
     Page<Purchase> findByPaymentStatus(PurchasePaymentStatus paymentStatus, Pageable pageable);
+
+    @Query("SELECT p FROM Purchase p WHERE " +
+            "(:supplierId IS NULL OR p.supplier.id = :supplierId) AND " +
+            "(:paymentStatus IS NULL OR p.paymentStatus = :paymentStatus) AND " +
+            "(:status IS NULL OR p.status = :status) AND " +
+            "(:startDate IS NULL OR p.purchaseDate >= :startDate) AND " +
+            "(:endDate IS NULL OR p.purchaseDate <= :endDate) AND " +
+            "(:search IS NULL OR LOWER(p.purchaseNumber) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(p.supplierInvoiceNumber) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(p.supplier.name) LIKE LOWER(CONCAT('%', :search, '%')))")
+    Page<Purchase> findPurchasesWithFilters(
+            @Param("supplierId") Long supplierId,
+            @Param("paymentStatus") PurchasePaymentStatus paymentStatus,
+            @Param("status") PurchaseStatus status,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
+            @Param("search") String search,
+            Pageable pageable
+    );
 }

@@ -1,5 +1,10 @@
 package com.hardwarepos.hardware_pos_backend.product;
 
+import com.hardwarepos.hardware_pos_backend.product.dto.ProductSummaryResponse;
+import com.hardwarepos.hardware_pos_backend.product.dto.UpdateProductRequest;
+import com.hardwarepos.hardware_pos_backend.product.dto.CreateProductRequest;
+import com.hardwarepos.hardware_pos_backend.product.dto.ProductResponse;
+
 import com.hardwarepos.hardware_pos_backend.brand.Brand;
 import com.hardwarepos.hardware_pos_backend.brand.BrandRepository;
 import com.hardwarepos.hardware_pos_backend.category.Category;
@@ -7,7 +12,7 @@ import com.hardwarepos.hardware_pos_backend.category.CategoryRepository;
 import com.hardwarepos.hardware_pos_backend.unit.MeasurementUnit;
 import com.hardwarepos.hardware_pos_backend.unit.MeasurementUnitRepository;
 import com.hardwarepos.hardware_pos_backend.inventory.InventoryService;
-import com.hardwarepos.hardware_pos_backend.sales.PagedResponse;
+import com.hardwarepos.hardware_pos_backend.sales.dto.PagedResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;

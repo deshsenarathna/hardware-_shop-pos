@@ -1,5 +1,8 @@
 package com.hardwarepos.hardware_pos_backend.product.barcode;
 
+import com.hardwarepos.hardware_pos_backend.product.barcode.dto.BarcodeResponse;
+import com.hardwarepos.hardware_pos_backend.product.barcode.dto.AddBarcodeRequest;
+
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

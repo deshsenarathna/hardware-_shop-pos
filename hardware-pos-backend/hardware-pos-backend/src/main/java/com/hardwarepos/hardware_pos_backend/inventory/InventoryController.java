@@ -1,6 +1,13 @@
 package com.hardwarepos.hardware_pos_backend.inventory;
 
-import com.hardwarepos.hardware_pos_backend.sales.PagedResponse;
+import com.hardwarepos.hardware_pos_backend.inventory.dto.AdjustStockRequest;
+import com.hardwarepos.hardware_pos_backend.inventory.dto.InventoryMetricsResponse;
+import com.hardwarepos.hardware_pos_backend.inventory.dto.StockTransactionResponse;
+import com.hardwarepos.hardware_pos_backend.inventory.dto.StockResponse;
+import com.hardwarepos.hardware_pos_backend.inventory.dto.InventoryItemResponse;
+import com.hardwarepos.hardware_pos_backend.inventory.dto.AddStockRequest;
+
+import com.hardwarepos.hardware_pos_backend.sales.dto.PagedResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

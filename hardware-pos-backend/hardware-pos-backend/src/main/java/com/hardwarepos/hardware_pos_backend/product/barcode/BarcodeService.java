@@ -1,5 +1,8 @@
 package com.hardwarepos.hardware_pos_backend.product.barcode;
 
+import com.hardwarepos.hardware_pos_backend.product.barcode.dto.BarcodeResponse;
+import com.hardwarepos.hardware_pos_backend.product.barcode.dto.AddBarcodeRequest;
+
 import com.hardwarepos.hardware_pos_backend.product.Product;
 import com.hardwarepos.hardware_pos_backend.product.ProductRepository;
 import org.springframework.http.HttpStatus;

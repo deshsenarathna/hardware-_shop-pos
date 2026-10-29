@@ -1,5 +1,8 @@
 package com.hardwarepos.hardware_pos_backend.category;
 
+import com.hardwarepos.hardware_pos_backend.category.dto.CategoryRequest;
+import com.hardwarepos.hardware_pos_backend.category.dto.CategoryResponse;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;

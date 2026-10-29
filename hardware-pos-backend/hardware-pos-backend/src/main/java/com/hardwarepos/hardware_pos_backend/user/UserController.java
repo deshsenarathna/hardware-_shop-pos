@@ -1,5 +1,8 @@
 package com.hardwarepos.hardware_pos_backend.user;
 
+import com.hardwarepos.hardware_pos_backend.user.dto.CreateUserRequest;
+import com.hardwarepos.hardware_pos_backend.user.dto.UserResponse;
+
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

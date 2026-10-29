@@ -1,5 +1,8 @@
 package com.hardwarepos.hardware_pos_backend.auth;
 
+import com.hardwarepos.hardware_pos_backend.auth.dto.LoginRequest;
+import com.hardwarepos.hardware_pos_backend.auth.dto.LoginResponse;
+
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

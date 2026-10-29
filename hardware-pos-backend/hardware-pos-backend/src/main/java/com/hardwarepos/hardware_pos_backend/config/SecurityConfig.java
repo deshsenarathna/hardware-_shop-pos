@@ -105,6 +105,24 @@ public class SecurityConfig {
                         .requestMatchers( HttpMethod.POST, "/api/inventory/**"
                         ).hasAnyRole("OWNER", "MANAGER")
 
+                        .requestMatchers( HttpMethod.GET, "/api/suppliers/**"
+                        ).hasAnyRole("OWNER", "MANAGER")
+
+                        .requestMatchers( HttpMethod.POST, "/api/suppliers/**"
+                        ).hasAnyRole("OWNER", "MANAGER")
+
+                        .requestMatchers( HttpMethod.PUT, "/api/suppliers/**"
+                        ).hasAnyRole("OWNER", "MANAGER")
+
+                        .requestMatchers( HttpMethod.DELETE, "/api/suppliers/**"
+                        ).hasAnyRole("OWNER", "MANAGER")
+
+                        .requestMatchers( HttpMethod.GET, "/api/purchases/**"
+                        ).hasAnyRole("OWNER", "MANAGER")
+
+                        .requestMatchers( HttpMethod.POST, "/api/purchases/**"
+                        ).hasAnyRole("OWNER", "MANAGER")
+
                         .requestMatchers( HttpMethod.GET, "/api/sales/**"
                         ).hasAnyRole("OWNER", "MANAGER", "CASHIER")
 

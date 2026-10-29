@@ -1,6 +1,11 @@
 package com.hardwarepos.hardware_pos_backend.product;
 
-import com.hardwarepos.hardware_pos_backend.sales.PagedResponse;
+import com.hardwarepos.hardware_pos_backend.product.dto.ProductSummaryResponse;
+import com.hardwarepos.hardware_pos_backend.product.dto.UpdateProductRequest;
+import com.hardwarepos.hardware_pos_backend.product.dto.CreateProductRequest;
+import com.hardwarepos.hardware_pos_backend.product.dto.ProductResponse;
+
+import com.hardwarepos.hardware_pos_backend.sales.dto.PagedResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

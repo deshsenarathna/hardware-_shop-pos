@@ -1,5 +1,8 @@
 package com.hardwarepos.hardware_pos_backend.auth;
 
+import com.hardwarepos.hardware_pos_backend.auth.dto.LoginRequest;
+import com.hardwarepos.hardware_pos_backend.auth.dto.LoginResponse;
+
 import com.hardwarepos.hardware_pos_backend.user.AppUser;
 import com.hardwarepos.hardware_pos_backend.user.AppUserRepository;
 import org.springframework.http.HttpStatus;
