@@ -25,6 +25,7 @@ export function AuthProvider({ children }) {
       username: loginResponse.username,
       role: loginResponse.role,
       token: loginResponse.token,
+      refreshToken: loginResponse.refreshToken,
     };
 
     sessionStorage.setItem(
@@ -35,10 +36,30 @@ export function AuthProvider({ children }) {
     setUser(authenticatedUser);
   }
 
+  function updateTokens(accessToken, refreshToken) {
+  setUser((prev) => {
+    if (!prev) return null;
+    const updated = { ...prev, token: accessToken, refreshToken };
+    sessionStorage.setItem("hardwarePosAuth", JSON.stringify(updated));
+    return updated;
+  });
+}
+
   function logout() {
-    sessionStorage.removeItem("hardwarePosAuth");
-    setUser(null);
+  const savedAuth = sessionStorage.getItem("hardwarePosAuth");
+  if (savedAuth) {
+    try {
+      const auth = JSON.parse(savedAuth);
+      if (auth.refreshToken) {
+        apiClient.post("/auth/logout", { refreshToken: auth.refreshToken }).catch(() => {});
+      }
+    } catch {
+      // ignore
+    }
   }
+  sessionStorage.removeItem("hardwarePosAuth");
+  setUser(null);
+}
 
   const value = {
     user,
@@ -47,6 +68,7 @@ export function AuthProvider({ children }) {
     isAuthenticated: Boolean(user?.token),
     login,
     logout,
+    updateTokens,
   };
 
   return (

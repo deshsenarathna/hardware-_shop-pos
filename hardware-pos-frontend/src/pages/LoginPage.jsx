@@ -44,8 +44,12 @@ function LoginPage() {
     try {
       const response = await apiClient.post(
         "/auth/login",
-        formData
+        formData,
+        
       );
+
+      //console.log("Access Token:", response.data.token),
+      //console.log("Refresh Token:", response.data.refreshToken)
 
       login(response.data);
       navigate("/dashboard", { replace: true });

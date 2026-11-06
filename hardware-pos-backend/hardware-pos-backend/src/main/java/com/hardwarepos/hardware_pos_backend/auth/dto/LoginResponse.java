@@ -1,13 +1,19 @@
 package com.hardwarepos.hardware_pos_backend.auth.dto;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
+@Getter
+@AllArgsConstructor
 public class LoginResponse {
 
     private final Long userId;
     private final String fullName;
     private final String username;
     private final String role;
-    private final String message;
     private final String token;
+    private final String refreshToken;
+    private final String message;
 
     public LoginResponse(
             Long userId,
@@ -17,35 +23,6 @@ public class LoginResponse {
             String token,
             String message
     ) {
-        this.userId = userId;
-        this.fullName = fullName;
-        this.username = username;
-        this.role = role;
-        this.token = token;
-        this.message = message;
-    }
-
-    public Long getUserId() {
-        return userId;
-    }
-
-    public String getFullName() {
-        return fullName;
-    }
-
-    public String getUsername() {
-        return username;
-    }
-
-    public String getRole() {
-        return role;
-    }
-
-    public String getMessage() {
-        return message;
-    }
-
-    public String getToken() {
-        return token;
+        this(userId, fullName, username, role, token, null, message);
     }
 }
