@@ -139,7 +139,7 @@ public class SaleService {
             BigDecimal lineTotal = unitPrice.multiply(quantity).setScale(2, RoundingMode.HALF_UP);
             subtotal = subtotal.add(lineTotal);
 
-            // 11. Create SaleItem with product snapshot
+            // 11. Create SaleItem with product snapshot including cost
             SaleItem saleItem = new SaleItem();
             saleItem.setSale(sale);
             saleItem.setProduct(product);
@@ -148,6 +148,8 @@ public class SaleService {
             saleItem.setUnitName(product.getUnit() != null ? product.getUnit().getName() : null);
             saleItem.setQuantity(quantity);
             saleItem.setUnitPrice(unitPrice);
+            BigDecimal unitCost = product.getPurchasePrice() != null ? product.getPurchasePrice() : BigDecimal.ZERO;
+            saleItem.setUnitCost(unitCost);
             saleItem.setDiscount(BigDecimal.ZERO);
             saleItem.setTotalPrice(lineTotal);
 
@@ -406,6 +408,10 @@ public class SaleService {
 
         Long prodId = prod != null ? prod.getId() : null;
 
+        BigDecimal unitCost = item.getUnitCost() != null
+                ? item.getUnitCost()
+                : (prod != null ? prod.getPurchasePrice() : null);
+
         return new SaleItemResponse(
                 item.getId(),
                 prodId,
@@ -414,6 +420,7 @@ public class SaleService {
                 unitName,
                 item.getQuantity(),
                 item.getUnitPrice(),
+                unitCost,
                 item.getTotalPrice()
         );
     }

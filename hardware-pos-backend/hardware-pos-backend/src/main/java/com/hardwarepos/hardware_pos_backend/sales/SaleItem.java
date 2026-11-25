@@ -36,6 +36,9 @@ public class SaleItem {
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal unitPrice;
 
+    @Column(name = "unit_cost", precision = 15, scale = 2)
+    private BigDecimal unitCost;
+
     @Column(precision = 15, scale = 2)
     private BigDecimal discount = BigDecimal.ZERO;
 
@@ -102,6 +105,14 @@ public class SaleItem {
 
     public void setUnitPrice(BigDecimal unitPrice) {
         this.unitPrice = unitPrice;
+    }
+
+    public BigDecimal getUnitCost() {
+        return unitCost;
+    }
+
+    public void setUnitCost(BigDecimal unitCost) {
+        this.unitCost = unitCost;
     }
 
     public BigDecimal getDiscount() {

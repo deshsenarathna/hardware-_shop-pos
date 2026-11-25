@@ -11,6 +11,7 @@ public class SaleItemResponse {
     private final String unitName;
     private final BigDecimal quantity;
     private final BigDecimal unitPrice;
+    private final BigDecimal unitCost;
     private final BigDecimal totalPrice;
 
     public SaleItemResponse(
@@ -23,6 +24,20 @@ public class SaleItemResponse {
             BigDecimal unitPrice,
             BigDecimal totalPrice
     ) {
+        this(id, productId, productCode, productName, unitName, quantity, unitPrice, null, totalPrice);
+    }
+
+    public SaleItemResponse(
+            Long id,
+            Long productId,
+            String productCode,
+            String productName,
+            String unitName,
+            BigDecimal quantity,
+            BigDecimal unitPrice,
+            BigDecimal unitCost,
+            BigDecimal totalPrice
+    ) {
         this.id = id;
         this.productId = productId;
         this.productCode = productCode;
@@ -30,6 +45,7 @@ public class SaleItemResponse {
         this.unitName = unitName;
         this.quantity = quantity;
         this.unitPrice = unitPrice;
+        this.unitCost = unitCost;
         this.totalPrice = totalPrice;
     }
 
@@ -59,6 +75,10 @@ public class SaleItemResponse {
 
     public BigDecimal getUnitPrice() {
         return unitPrice;
+    }
+
+    public BigDecimal getUnitCost() {
+        return unitCost;
     }
 
     public BigDecimal getTotalPrice() {
